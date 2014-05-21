@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><?page id="backuprestore" title="Selective user restore"?>
+<?taglib uri="/WEB-INF/tld/web/core.dsp.tld" prefix="c" ?>
+<?init class="es.caib.seycon.ng.web.CheckPermisos" arg0="selfCertificate" ?>
+<?component name="input_criteri" macro-uri="/comu/input_criteri.zul"?>
+<?component name="input_criteri_data" macro-uri="/comu/input_criteri_data.zul"?>
+<?component name="input_dada" macro-uri="/comu/input_dada.zul"?>
+<?component name="input_etiqueta" macro-uri="/comu/input_etiqueta.zul"?>
+<zk xmlns:h="http://www.w3.org/1999/xhtml">
+
+	<style src="~./styles/estil.css" />
+
+	<datamodel id="model" rootNode="root"
+		src="addon/backup/descriptor.xml" />
+
+	<zscript>
+	<![CDATA[
+	import es.caib.zkib.datasource.*;
+	boolean canConfigure = execution.getNativeRequest().isUserInRole(
+			"backup:configure/*");
+	boolean canRestore = execution.getNativeRequest().isUserInRole(
+			"backup:restore/*");
+	model.getVariables().declareVariable("queryEnabled", false);
+	
+	void search ()
+	{
+		model.getVariables().declareVariable("user", userQuery.getFellow("textbox").getValue());
+		model.getVariables().declareVariable("date", dateQuery.getFellow("datebox").getValue());
+		model.getVariables().declareVariable("freeText", textQuery.getFellow("textbox").getValue());
+		model.getVariables().declareVariable("queryEnabled", true);
+		model.refresh();
+	}
+	
+	void restore ()
+	{
+		es.caib.zkib.zkiblaf.Missatgebox.confirmaOK_CANCEL(org.zkoss.util.resource.Labels.getLabel("backup.confirmRestore"),
+				new org.zkoss.zk.ui.event.EventListener() {
+			public void onEvent (Event event)
+			{
+				if (event.getData().equals (es.caib.zkib.zkiblaf.Missatgebox.OK))
+				{
+					doRestore();
+				}
+			}
+		});
+	}
+	
+	void doRestore () 
+	{
+		boolean any = false;
+		javax.transaction.UserTransaction tx;
+		tx = new javax.naming.InitialContext().lookup("/UserTransaction");
+		com.soffid.iam.addons.backup.service.ejb.UserBackupService backupSvc = 
+			new javax.naming.InitialContext().
+				lookup(
+					com.soffid.iam.addons.backup.service.ejb.UserBackupServiceHome.JNDI_NAME
+						).create ();
+		boolean done = false;
+		
+		Listbox backupsList = lista.getFellow("backupsList");
+		try {
+			tx.begin();
+			for (int i = 0; i < backupsList.getItemCount(); i++)
+			{
+				Listitem item = backupsList.getItemAtIndex(i);
+				Checkbox cb = item.getChildren().get(0).getChildren().get(0);
+				if (cb.isChecked() )
+				{
+					any = true;
+					backupSvc.restoreBackup(item.getValue().getInstance());
+				}
+			}
+			done = true;
+		} finally {
+			if (tx.getStatus() == javax.transaction.Status.STATUS_MARKED_ROLLBACK)
+				tx.rollback();
+			else
+				tx.commit();
+		}
+		if (!any)
+		{
+			es.caib.zkib.zkiblaf.Missatgebox.info(org.zkoss.util.resource.Labels.getLabel("backup.noneSelected"));
+		}
+		if (done)
+		{
+			es.caib.zkib.zkiblaf.Missatgebox.avis(org.zkoss.util.resource.Labels.getLabel("backup.restoreComplete"));
+			backupsList.setSelectedItem(null);
+			for (int i = 0; i < backupsList.getItemCount(); i++)
+			{
+				Listitem item = backupsList.getItemAtIndex(i);
+				Checkbox cb = item.getChildren().get(0).getChildren().get(0);
+				if (cb.isChecked())
+				{
+					cb.setChecked(false);
+					item.getChildren().get(4).getChildren().get(0).setSrc("/img/enable.png");
+				}
+			}
+		}
+	}
+	
+	void showXml (Component c)
+	{
+		es.caib.zkib.binder.BindContext ctx = XPathUtils.getComponentContext(c);
+		String text = XPathUtils.getValue(ctx, "text[1]").getInstance();
+		textWindow.getFellow("textContent").setValue(text);
+		textWindow.doHighlighted();		
+	}
+]]>
+	</zscript>
+
+	<frame id="ui" title="${c:l('backup.title')}" width="99%">
+		<form dataPath="/model:/query">
+			<criteris height="${queryWindowMin}" id="queryWindow"
+				onOK="search()" width="${amplaria}">
+				<vbox width="60%">
+					<hbox>
+						<input_criteri id="userQuery"
+							etiqueta="${c:l('backup.user')}" />
+						<input_criteri_data id="dateQuery"
+							etiqueta="${c:l('backup.date')}"/>
+						<imageclic onClick="search()"
+							src="~./img/fletxa_cerca.gif" />
+					</hbox>
+					<hbox>
+						<input_criteri id="textQuery" width_custom="500px"
+							etiqueta="${c:l('backup.text')}"/>
+					</hbox>
+				</vbox>
+				<separator spacing="9px" />
+			</criteris>
+		</form>
+
+		<navegador id="lista" width="${amplaria}">
+			<toolbar>
+				<toolbarbutton  visible="${canRestore}"
+					onClick="restore()" label="Restore"/>
+				<toolbarbutton  visible="${canConfigure}" style="float: right;"
+					onClick="configureWindow.doHighlighted();" label="Configure"/>
+					
+			</toolbar>
+			<listbox id="backupsList"
+				dataPath="/model:/backup" fixedLayout="true" height="96%"
+				onClick="" onSelect="" rows="${fileres}" >
+				<listhead>
+					<listheader label="" width="2em"/>
+					<listheader label="${c:l('backup.user')}"
+						sort="auto"  width="30%"/>
+					<listheader label="${c:l('backup.date')}"
+						sort="auto"  width="30%"/>
+					<listheader label="${c:l('backup.validUntil')}"
+						sort="auto"  width="30%"/>
+					<listheader label= ""  width="2em"/>
+				</listhead>
+				<listfoot>
+					<listfooter span="3">
+						<label id="listboxFoot"
+							style="margin-left: 10px;" />
+					</listfooter>
+				</listfoot>
+				<dataitem bind=".">
+					<listcell>
+						<checkbox></checkbox>
+					</listcell>
+					<listcell bind="@userName" />
+					<listcell>
+						<datebox disabled="true" bind="@backupDate" format="${c:l('accounts.dateFormat')}" width="15em"/>
+					</listcell>
+					<listcell>
+						<datebox disabled="true" bind="@validUntil"  format="${c:l('accounts.dateFormat')}"  width="15em"/>
+					</listcell>
+					<listcell>
+						<image onClick="showXml(event.target);" src="/img/info.png"></image>
+					</listcell>
+				</dataitem>
+			</listbox>
+		</navegador>
+	</frame>
+	
+	<window width="80%" id="textWindow" visible="false" title="${c:l('backup.contents')}" closable="true"
+		onClose="self.setVisible(false); event.stopPropagation();">
+		<textbox readonly="true" width="100%" multiline="true" rows="20" id="textContent"/>
+	</window>
+	
+	<window width="40%" id="configureWindow" visible="false" title="${c:l('backup.configure')}" >
+		<div style="display: block;">
+			<div width="100%" height="1em">
+				<label style="float:left;" value="${c:l('backup.delay') }"></label>
+				<intbox style="width:30%; float:right; " 
+					bind="/model:/configuration[1]/@userBackupDelay"></intbox> 
+			</div>
+			<div width="100%"  height="1em">
+				<label  style="float:left;" value="${c:l('backup.copies') }"></label>
+				<intbox style="width:30%; float:right; " 
+					bind="/model:/configuration[1]/@userBackupCopies"></intbox> 
+			</div>
+		</div>
+		<div style="width: 100%; margin-top: 20px; display: block"  height="2em">
+			<button label="${c:l('backup.cancel') }" style="float:right;">
+				<attribute name="onClick"><![CDATA[
+					model.getJXPathContext().getValue("/configuration").refresh();
+					configureWindow.setVisible(false);
+				]]></attribute>
+			</button>
+			<button label="${c:l('backup.accept') }" style="float:right; margin-right:15px;">
+				<attribute name="onClick"><![CDATA[
+					model.commit ();
+					configureWindow.setVisible(false);
+				]]></attribute>
+			</button>
+		</div>
+	</window>
+</zk>

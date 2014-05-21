@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- IMPORTANT NOTE: -->
+
+<autoritzacions>
+	<autoritzacio>
+		<codi>backup:configure</codi>
+		<descripcio>Configure backup parameters</descripcio>
+		<ambit>User Backup</ambit>
+		<hereta>*</hereta>
+	</autoritzacio>
+
+	<autoritzacio>
+		<codi>backup:query</codi>
+		<descripcio>Query user backups</descripcio>
+		<ambit>User Backup</ambit>
+		<hereta>*</hereta>
+	</autoritzacio>
+
+	<autoritzacio>
+		<codi>backup:restore</codi>
+		<descripcio>Restore user backups</descripcio>
+		<ambit>User Backup</ambit>
+		<hereta>*</hereta>
+	</autoritzacio>
+
+
+</autoritzacions>

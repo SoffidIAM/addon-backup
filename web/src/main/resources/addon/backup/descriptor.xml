@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zkib-model>
+	<datanode name="root">
+		<finder name="configuration" type="config" refreshAfterCommit="false">
+			<ejb-finder jndi="soffid/ejb/com.soffid.iam.addons.backup.service.UserBackupService"
+				method="getConfig">
+			</ejb-finder>
+		</finder>
+
+		<finder name="backup" type="backup" refreshAfterCommit="false">
+			<ejb-finder jndi="soffid/ejb/com.soffid.iam.addons.backup.service.UserBackupService"
+				method="findBackup"
+				if="${queryEnabled}">
+				<parameter value="${user}" />
+				<parameter value="${date}" />
+				<parameter value="${freeText}" />
+			</ejb-finder>
+		</finder>
+	</datanode>
+	
+	
+	<datanode name="config">
+		<ejb-handler jndi="soffid/ejb/com.soffid.iam.addons.backup.service.UserBackupService">
+			<update-method method="setConfig">
+				<parameter value="${instance}" />
+			</update-method>
+		</ejb-handler>
+		<validator>
+			<attribute-validator expr="${instance.userBackupCopies}" notNull="true" friendlyName="backup.userBackupCopies"/>
+			<attribute-validator expr="${instance.userBackupDelay}" notNull="true" friendlyName="backup.userBackpuDelay"/>
+		</validator>
+	</datanode>
+
+	<datanode name="backup">
+		<custom-attribute name="checked">
+			return false;
+		</custom-attribute>
+		<finder name="text" type="text" refreshAfterCommit="false">
+			<ejb-finder jndi="soffid/ejb/com.soffid.iam.addons.backup.service.UserBackupService"
+				method="getBackupContent">
+				<parameter value="${instance}" />
+			</ejb-finder>
+		</finder>
+	</datanode>
+	
+	<datanode name="text"/>
+</zkib-model>

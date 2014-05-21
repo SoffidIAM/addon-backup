@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<SoffidIAMPlugin xmlns="http://www.soffid.com/schema/iam-plugin-v1"> 
+	<name>Soffid Backup addon</name>
+	<version>${pom.version}</version>
+	<core name="Backup common classes" resource="backup-common-${pom.version}.jar"/>
+	<core name="Backup core classes" resource="backup-core-${pom.version}.jar"/>
+	<web name="Backup web files" resource="backup-web-${pom.version}.war"/>
+</SoffidIAMPlugin>
