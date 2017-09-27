@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+
+<beans>
+
+	<!-- ========================= Interceptors ========================= -->
+	<bean id="taskEntityDaoInterceptor-Backup" class="com.soffid.iam.addons.backup.interceptor.BackupInterceptor" singleton="true">
+		<property name="sessionFactory"><ref bean="sessionFactory"/></property>
+		<property name="userBackupService"><ref bean="backup-userBackupService"/></property>
+	</bean>
+
+	<!-- ========================= End of Interceptor DEFINITIONS ========================= -->
+
+</beans>

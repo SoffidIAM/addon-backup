@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><?page id="federacioIdentitats" title="Self certificate configuration"?>
+<?taglib uri="/WEB-INF/tld/web/core.dsp.tld" prefix="c" ?>
+<?init class="es.caib.seycon.ng.web.CheckPermisos" arg0="selfCertificate" ?>
+<?component name="input_criteri" macro-uri="/comu/input_criteri.zul"?>
+<?component name="input_dada" macro-uri="/comu/input_dada.zul"?>
+<?component name="input_etiqueta" macro-uri="/comu/input_etiqueta.zul"?>
+<zk xmlns:h="http://www.w3.org/1999/xhtml">
+
+	<style src="~./styles/estil.css" />
+
+	<zscript>
+	<![CDATA[
+	import es.caib.zkib.datasource.*;
+	boolean canRestore = execution.getNativeRequest().isUserInRole(
+			"backup:restore/*");
+	
+	void restore ()
+	{
+		es.caib.zkib.zkiblaf.Missatgebox.confirmaOK_CANCEL(org.zkoss.util.resource.Labels.getLabel("backup.confirmRestore"),
+				new org.zkoss.zk.ui.event.EventListener() {
+			public void onEvent (Event event)
+			{
+				if (event.getData().equals (es.caib.zkib.zkiblaf.Missatgebox.OK))
+				{
+					doRestore();
+				}
+			}
+		});
+	}
+	
+	void doRestore () 
+	{
+		boolean any = false;
+		javax.transaction.UserTransaction tx;
+		tx = new javax.naming.InitialContext().lookup("/UserTransaction");
+		com.soffid.iam.addons.backup.service.ejb.UserBackupService backupSvc = 
+			new javax.naming.InitialContext().
+				lookup(
+					com.soffid.iam.addons.backup.service.ejb.UserBackupServiceHome.JNDI_NAME
+						);
+		boolean done = false;
+		
+		
+		Listitem item = backupsList.getSelectedItem();
+		if (item == null)
+		{
+			es.caib.zkib.zkiblaf.Missatgebox.info(org.zkoss.util.resource.Labels.getLabel("backup.noneSelected"));
+			return;			
+		}
+		
+		es.caib.zkib.component.DataModel model = Path.getComponent("/model");
+		if (model.isCommitPending())
+		{
+			es.caib.zkib.zkiblaf.Missatgebox.info(org.zkoss.util.resource.Labels.getLabel("backup.pendingChange"));
+			return;
+		}
+		
+		backupSvc.restoreBackup(item.getValue().getInstance());
+
+		es.caib.zkib.zkiblaf.Missatgebox.avis(org.zkoss.util.resource.Labels.getLabel("backup.restoreComplete"));
+		
+		es.caib.zkib.component.DataListbox dlb = Path.getComponent("/esquema/lista/listbox");
+		long userId = dlb.getJXPathContext().getValue("@id");
+		model.refresh();
+		es.caib.zkib.datamodel.DataNodeCollection coll = model.getJXPathContext().getValue("/usuari");
+		for (int i = 0; i < coll.getSize(); i++)
+		{
+			es.caib.seycon.ng.comu.Usuari usuari = coll.getDataModel(i).getInstance();
+			if (usuari.getId().equals (userId))
+			{
+				dlb.setSelectedIndex(i);
+				break;
+			}
+		}	
+	}
+	
+	void showXml (Component c)
+	{
+		es.caib.zkib.binder.BindContext ctx = XPathUtils.getComponentContext(c);
+		String text = XPathUtils.getValue(ctx, "text[1]").getInstance();
+		textWindow.getFellow("textContent").setValue(text);
+		textWindow.doHighlighted();		
+	}
+
+]]>
+	</zscript>
+
+	<toolbar>
+		<toolbarbutton visible="${canRestoreBackup}" onClick="restore()"
+			label="Restore" />
+	</toolbar>
+	<listbox id="backupsList" dataPath="/esquema/lista/listbox:/backups"
+		fixedLayout="true" height="96%" onClick="" onSelect=""
+		rows="${fileres}">
+		<listhead>
+			<listheader label="${c:l('backup.date')}" sort="auto"
+				width="30%" />
+			<listheader label="${c:l('backup.validUntil')}" sort="auto"
+				width="30%" />
+			<listheader label="" width="2em" />
+		</listhead>
+		<listfoot>
+			<listfooter span="3">
+				<label id="listboxFoot" style="margin-left: 10px;" />
+			</listfooter>
+		</listfoot>
+		<dataitem bind=".">
+			<listcell>
+				<datebox disabled="true" bind="@backupDate"
+					format="${c:l('accounts.dateFormat')}" width="15em" />
+			</listcell>
+			<listcell>
+				<datebox disabled="true" bind="@validUntil"
+					format="${c:l('accounts.dateFormat')}" width="15em" />
+			</listcell>
+			<listcell>
+				<image onClick="showXml(event.target);"
+					src="/img/info.png">
+				</image>
+			</listcell>
+		</dataitem>
+	</listbox>
+	
+	<window width="80%" id="textWindow" visible="false"
+		title="${c:l('backup.contents')}" closable="true"
+		onClose="self.setVisible(false); event.stopPropagation();">
+		<textbox readonly="true" width="100%" multiline="true" rows="20"
+			id="textContent" />
+	</window>
+</zk>
