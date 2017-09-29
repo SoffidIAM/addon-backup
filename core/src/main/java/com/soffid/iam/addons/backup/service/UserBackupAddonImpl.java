@@ -1,8 +1,7 @@
 package com.soffid.iam.addons.backup.service;
 
 import com.soffid.iam.addons.backup.common.UserBackup;
-
-import es.caib.seycon.ng.model.UsuariEntity;
+import com.soffid.iam.model.UserEntity;
 
 public class UserBackupAddonImpl extends UserBackupAddonBase {
 
@@ -12,7 +11,7 @@ public class UserBackupAddonImpl extends UserBackupAddonBase {
 	}
 
 	@Override
-	protected void handleRestoreBackup(UsuariEntity user, UserBackup backup,
+	protected void handleRestoreBackup(UserEntity user, UserBackup backup,
 			StringBuffer sb) throws Exception {
 	}
 

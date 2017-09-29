@@ -17,6 +17,7 @@ public class UserBackupEntityDaoImpl extends UserBackupEntityDaoBase
 			throw new IllegalArgumentException(
 				"UserBackupEntityDao.update - 'entity' can not be null");
 		}
+		entity.setTenant  ( getTenantEntityDao().load (com.soffid.iam.utils.Security.getCurrentTenantId()) );
 		this.getHibernateTemplate().save(entity);
 		
 		// NO flush

@@ -48,12 +48,12 @@
 	{
 		boolean any = false;
 		javax.transaction.UserTransaction tx;
-		tx = new javax.naming.InitialContext().lookup("/UserTransaction");
+		tx = new javax.naming.InitialContext() .lookup("java:/comp/UserTransaction");
 		com.soffid.iam.addons.backup.service.ejb.UserBackupService backupSvc = 
 			new javax.naming.InitialContext().
 				lookup(
 					com.soffid.iam.addons.backup.service.ejb.UserBackupServiceHome.JNDI_NAME
-						).create ();
+						);
 		boolean done = false;
 		
 		Listbox backupsList = lista.getFellow("backupsList");
@@ -108,10 +108,10 @@
 	</zscript>
 
 	<frame id="ui" title="${c:l('backup.title')}" width="99%">
-		<form dataPath="/model:/query">
-			<criteris height="${queryWindowMin}" id="queryWindow"
-				onOK="search()" width="${amplaria}">
-				<vbox width="60%">
+		<form dataPath="/model:/query"  width="100%">
+			<criteris height="" id="queryWindow"
+				onOK="search()" width="100%">
+				<vbox width="100%">
 					<hbox>
 						<input_criteri id="userQuery"
 							etiqueta="${c:l('backup.user')}" />

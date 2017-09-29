@@ -8,7 +8,7 @@ package com.soffid.iam.addons.backup.common;
 import com.soffid.mda.annotation.*;
 
 @ValueObject 
-public abstract class UserBackupConfig {
+public class UserBackupConfig {
 
 	@Nullable
 	public java.lang.String fullBackupDir;

@@ -8,9 +8,8 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.hibernate.SessionFactory;
 
 import com.soffid.iam.addons.backup.service.UserBackupService;
-
-import es.caib.seycon.ng.model.TasqueEntity;
-import es.caib.seycon.ng.sync.engine.TaskHandler;
+import com.soffid.iam.model.TaskEntity;
+import com.soffid.iam.sync.engine.TaskHandler;
 
 public class BackupInterceptor implements Interceptor, MethodInterceptor
 {
@@ -42,12 +41,16 @@ public class BackupInterceptor implements Interceptor, MethodInterceptor
 			! (mi.getArguments()[0] instanceof Long))
 		{
 			Object param = mi.getArguments()[0];
-			if (method.getName().equals("create") && param instanceof TasqueEntity)
+			if (method.getName().equals("create") && param instanceof TaskEntity)
 			{
-				TasqueEntity tasque = (TasqueEntity) param;
-				if (tasque.getTransa().equals(TaskHandler.UPDATE_USER))
+				TaskEntity tasque = (TaskEntity) param;
+				if (tasque.getTransaction().equals(TaskHandler.UPDATE_USER) && tasque.getUser() != null)
 				{
-					userBackupService.performBackup(tasque.getUsuari());
+					userBackupService.performBackup(tasque.getUser());
+				}
+				if (tasque.getTransaction().equals(TaskHandler.UPDATE_ACCOUNT) && tasque.getUser() != null && tasque.getSystemName() != null)
+				{
+					userBackupService.performBackup(tasque.getUser(), tasque.getSystemName());
 				}
 			}
 		}

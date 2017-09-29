@@ -3,6 +3,7 @@ package com.soffid.iam.addons.backup.service;
 import java.io.File;
 
 import com.soffid.iam.addons.backup.common.UserBackupConfig;
+import com.soffid.iam.api.Tenant;
 
 public class BackupBootstrapServiceImpl extends BackupBootstrapServiceBase {
 
@@ -33,7 +34,7 @@ public class BackupBootstrapServiceImpl extends BackupBootstrapServiceBase {
 		}		
 		if (cfg.getFullBackupDir() == null)
 		{
-			File f = new File (System.getProperty("jboss.home.dir"));
+			File f = new File (System.getProperty("catalina.home"));
 			f = f.getParentFile();
 			f = new File (f, "backup");
 			cfg.setFullBackupDir(f.getAbsolutePath());
@@ -48,6 +49,10 @@ public class BackupBootstrapServiceImpl extends BackupBootstrapServiceBase {
 
 	@Override
 	protected void handleSyncServerBoot() throws Exception {
+	}
+
+	@Override
+	protected void handleTenantBoot(Tenant tenant) throws Exception {
 	}
 
 }

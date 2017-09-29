@@ -9,6 +9,7 @@ import com.soffid.iam.addons.backup.common.UserBackupConfig;
 import com.soffid.iam.addons.backup.service.UserBackupService;
 import com.soffid.test.AbstractHibernateTest;
 
+import es.caib.seycon.ng.ServiceLocator;
 import es.caib.seycon.ng.comu.Account;
 import es.caib.seycon.ng.comu.AccountType;
 import es.caib.seycon.ng.comu.Aplicacio;
@@ -44,17 +45,15 @@ import es.caib.seycon.ng.servei.DispatcherService;
 import es.caib.seycon.ng.servei.DominiUsuariService;
 import es.caib.seycon.ng.servei.GrupService;
 import es.caib.seycon.ng.servei.InternalPasswordService;
-import es.caib.seycon.ng.servei.InternalPasswordServiceImpl;
 import es.caib.seycon.ng.servei.PasswordService;
 import es.caib.seycon.ng.servei.PuntEntradaService;
-import es.caib.seycon.ng.servei.SeyconServiceLocator;
 import es.caib.seycon.ng.servei.UsuariService;
 import es.caib.seycon.ng.servei.XarxaService;
 import es.caib.seycon.ng.utils.Security;
 
 public class BackupTest extends AbstractHibernateTest {
 	
-	protected InternalPasswordServiceImpl ps;
+	protected com.soffid.iam.service.InternalPasswordServiceImpl ps;
 	protected ConfiguracioService configSvc;
 	protected AplicacioService appSvc;
 	protected DominiUsuariService dominiSvc;
@@ -73,8 +72,6 @@ public class BackupTest extends AbstractHibernateTest {
 	public void setupdb() throws InternalErrorException,
 			NeedsAccountNameException
 	{ 
-		SeyconServiceLocator.instance().init("testBeanRefFactory.xml", "beanRefFactory"); //$NON-NLS-1$ //$NON-NLS-2$
-
 		configSvc = (ConfiguracioService) context.getBean(ConfiguracioService.SERVICE_NAME);
 		appSvc = (AplicacioService) context.getBean(AplicacioService.SERVICE_NAME);
 		grupSvc = (GrupService) context.getBean(GrupService.SERVICE_NAME);
@@ -102,9 +99,15 @@ public class BackupTest extends AbstractHibernateTest {
 	@Override
 	protected void setUp() throws Exception
 	{
+		
+
 		super.setUp();
-	
-		Security.nestedLogin("Test", new String[] { 
+
+		com.soffid.iam.ServiceLocator.instance().init("testBeanRefFactory.xml", "beanRefFactory");
+		
+		System.setProperty("catalina.home", "target"); //$NON-NLS-1$ //$NON-NLS-2$
+
+		Security.nestedLogin("master", "Test", new String[] { 
 				Security.AUTO_AUTHORIZATION_ALL });
 		try {
 			setupdb();
@@ -116,14 +119,13 @@ public class BackupTest extends AbstractHibernateTest {
 
 	public void testBackup () throws InternalErrorException
 	{	
-		Security.nestedLogin("Test", new String[] { 
-				Security.AUTO_AUTHORIZATION_ALL });
+		Security.nestedLogin("master", "Test", Security.ALL_PERMISSIONS);
 		try {
 			UserBackupConfig backupCfg = backupSvc.getConfig();
 			backupCfg.setUserBackupDelay(0L);
 			backupSvc.setConfig(backupCfg);
 			System.out.println ("Updating admin user");
-			Log.info("Updateing admin user");
+			Log.info("Updating admin user");
 			Usuari usu = usuariSvc.findUsuariByCodiUsuari("admin");
 			usu.setSegonLlinatge("Segon llinatge");
 			usuariSvc.update(usu);

@@ -9,7 +9,7 @@
 			<xsl:apply-templates select="node()|@*" />
 
 			<finder name="backups" type="backup" refreshAfterCommit="true" > 
-				<ejb-finder jndi="soffid/ejb/com.soffid.iam.addons.backup.service.UserBackupService"
+				<ejb-finder jndi="openejb:/local/soffid.ejb.com.soffid.iam.addons.backup.service.UserBackupService"
 					method="getUserBackups"
 					if="${{canQueryBackup}}">
 					<parameter value="${{instance.id}}" />
@@ -28,7 +28,7 @@
 					return false;
 				</custom-attribute>
 				<finder name="text" type="backupText" refreshAfterCommit="false">
-					<ejb-finder jndi="soffid/ejb/com.soffid.iam.addons.backup.service.UserBackupService"
+					<ejb-finder jndi="openejb:/local/soffid.ejb.com.soffid.iam.addons.backup.service.UserBackupService"
 						method="getBackupContent">
 						<parameter value="${{instance}}" />
 					</ejb-finder>

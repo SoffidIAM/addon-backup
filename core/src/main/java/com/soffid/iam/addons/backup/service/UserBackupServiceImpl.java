@@ -33,24 +33,24 @@ import org.w3c.dom.NodeList;
 import com.soffid.iam.addons.backup.common.UserBackup;
 import com.soffid.iam.addons.backup.common.UserBackupConfig;
 import com.soffid.iam.addons.backup.model.UserBackupEntity;
+import com.soffid.iam.api.Configuration;
+import com.soffid.iam.api.DomainValue;
+import com.soffid.iam.api.GroupUser;
+import com.soffid.iam.api.Role;
 import com.soffid.iam.api.RoleAccount;
 import com.soffid.iam.api.User;
+import com.soffid.iam.api.UserAccount;
+import com.soffid.iam.api.UserData;
+import com.soffid.iam.api.System;
+import com.soffid.iam.model.AccountEntity;
+import com.soffid.iam.model.UserAccountEntity;
+import com.soffid.iam.model.UserEntity;
+import com.soffid.iam.utils.ConfigurationCache;
 
-import es.caib.seycon.ng.comu.Configuracio;
-import es.caib.seycon.ng.comu.DadaUsuari;
-import es.caib.seycon.ng.comu.Dispatcher;
-import es.caib.seycon.ng.comu.Grup;
-import es.caib.seycon.ng.comu.Rol;
-import es.caib.seycon.ng.comu.RolAccount;
-import es.caib.seycon.ng.comu.UserAccount;
-import es.caib.seycon.ng.comu.Usuari;
-import es.caib.seycon.ng.comu.UsuariGrup;
-import es.caib.seycon.ng.comu.ValorDomini;
+import es.caib.seycon.ng.comu.AccountType;
 import es.caib.seycon.ng.exception.AccountAlreadyExistsException;
 import es.caib.seycon.ng.exception.InternalErrorException;
 import es.caib.seycon.ng.exception.NeedsAccountNameException;
-import es.caib.seycon.ng.model.UsuariEntity;
-import es.caib.seycon.ng.servei.ConfiguracioService;
 import es.caib.seycon.ng.utils.Security;
 import es.caib.seycon.util.Base64;
 
@@ -72,11 +72,11 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			
 	@Override
 	protected void handlePerformBackup(String userId) throws Exception {
-		UsuariEntity user = getUsuariEntityDao().findByCodi(userId);
+		UserEntity user = getUserEntityDao().findByUserName(userId);
 		if (user == null)
 			return;
 		
-		Security.nestedLogin(Security.getCurrentAccount(), new String [] { Security.AUTO_AUTHORIZATION_ALL });
+		Security.nestedLogin(Security.getCurrentAccount(), Security.ALL_PERMISSIONS);
 		String xml;
 		try{
 			xml = generateXml (user);
@@ -85,7 +85,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		}
 		long order = 0;
 		Date now = new Date();
-		List<UserBackupEntity> oldBackups = getUserBackupEntityDao().findByUser(user.getCodi());
+		List<UserBackupEntity> oldBackups = getUserBackupEntityDao().findByUser(user.getUserName());
 		
 		// Sort from high to low
 		Collections.sort(oldBackups, new Comparator<UserBackupEntity>() {
@@ -129,53 +129,65 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		backup.setBackupDate(new Date());
 		backup.setData(xml);
 		backup.setOrder(new Long(0));
-		backup.setUserName(user.getCodi());
+		backup.setUserName(user.getUserName());
 		getUserBackupEntityDao().create(backup);
 	}
 
-	private String generateXml(UsuariEntity userEntity) throws InternalErrorException {
+	@Override
+	protected void handlePerformBackup(String userId, String system) throws Exception {
+		AccountEntity account = getAccountEntityDao().findByNameAndSystem(userId, system);
+		
+		if (account != null && account.getType().equals(AccountType.USER))
+		{
+			for ( UserAccountEntity u: account.getUsers())
+			{
+				handlePerformBackup(u.getUser().getUserName());
+			}
+		}
+	}
+
+	private String generateXml(UserEntity userEntity) throws InternalErrorException {
 		StringBuffer sb = new StringBuffer();
 		sb.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>")
 			.append("\n");
 		
 		serialize (sb, 0, USER_BACKUP, null, false);
-		Usuari usuari = getUsuariEntityDao().toUsuari(userEntity);
-		User user = User.toUser( usuari );
+		User user = getUserEntityDao().toUser(userEntity);
 		
 		serialize (sb, 2, USER, user, true);
 		
-		for (UserAccount account: getAccountService().getUserAccounts(usuari))
+		for (UserAccount account: getAccountService().getUserAccounts(user))
 		{
 			if (!account.isDisabled())
 			{
 				serialize (sb, 2, ACCOUNT, null, false);
 				serialize (sb, 4, NAME, account.getName(), true);
-				serialize (sb, 4, SYSTEM, account.getDispatcher(), true);
-				for (RolAccount rolAccount: getAplicacioService().findRolAccountByAccount(account.getId()))
+				serialize (sb, 4, SYSTEM, account.getSystem(), true);
+				for (RoleAccount RoleAccount: getApplicationService().findRoleAccountByAccount(account.getId()))
 				{
 					serialize (sb, 4, ROLE, null, false);
-					serialize (sb, 6, NAME, rolAccount.getNomRol(), true);
-					serialize (sb, 6, SYSTEM, rolAccount.getBaseDeDades(), true);
-					if (rolAccount.getValorDomini() != null)
-						serialize (sb, 6, DOMAIN, rolAccount.getValorDomini().getValor(), true);
+					serialize (sb, 6, NAME, RoleAccount.getRoleName(), true);
+					serialize (sb, 6, SYSTEM, RoleAccount.getSystem(), true);
+					if (RoleAccount.getDomainValue() != null)
+						serialize (sb, 6, DOMAIN, RoleAccount.getDomainValue().getValue(), true);
 					closeTag (sb, 4, ROLE);
 				}
 				closeTag (sb, 2, ACCOUNT);
 			}
 		}
 		
-		for (UsuariGrup usuariGrup: getGrupService().findUsuariGrupsByCodiUsuari(userEntity.getCodi()))
+		for (GroupUser userGrup: getGroupService().findUsersGroupByUserName(userEntity.getUserName()))
 		{
-			serialize (sb, 2, GROUP_MEMBERSHIP, usuariGrup.getCodiGrup(), true);
+			serialize (sb, 2, GROUP_MEMBERSHIP, userGrup.getGroup(), true);
 		}
 		
-		for (DadaUsuari dada: getUsuariService().findDadesUsuariByCodiUsuari(userEntity.getCodi()))
+		for (UserData dada: getUserService().findUserDataByUserName(userEntity.getUserName()))
 		{
-			if (dada.getValorDada() != null)
+			if (dada.getValue() != null)
 			{
 				serialize (sb, 2, CUSTOM_DATA, null, false);
-				serialize (sb, 4, TAG, dada.getCodiDada(), true);
-				serialize (sb, 4, VALUE, dada.getValorDada(), true);
+				serialize (sb, 4, TAG, dada.getAttribute(), true);
+				serialize (sb, 4, VALUE, dada.getValue(), true);
 				closeTag(sb, 2, CUSTOM_DATA);
 			}
 		}
@@ -266,9 +278,9 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			throw new InternalErrorException (String.format("Unexpected tag %s", update.getTagName()));
 		User user = new User();
 		List<UserAccount> accounts = new LinkedList<UserAccount>();
-		List<RolAccount> roleGrants = new LinkedList<RolAccount>();
+		List<RoleAccount> roleGrants = new LinkedList<RoleAccount>();
 		List<String> groups = new LinkedList<String>();
-		List<DadaUsuari> dades = new LinkedList<DadaUsuari>();
+		List<UserData> dades = new LinkedList<UserData>();
 		
 		NodeList children = update.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++)
@@ -290,7 +302,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 					groups.add (child.getTextContent());
 				else if (tag.equals (CUSTOM_DATA))
 				{
-					DadaUsuari dada = new DadaUsuari ();
+					UserData dada = new UserData ();
 					parseDada (child, dada);
 					dades.add (dada);
 				}
@@ -301,15 +313,13 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			}
 		}
 		
-		Security.nestedLogin(Security.getCurrentAccount(), new String[] { 
-				Security.AUTO_AUTHORIZATION_ALL });
+		Security.nestedLogin(Security.getCurrentAccount(), Security.ALL_PERMISSIONS);
 		try {
-			Usuari usuari = Usuari.toUsuari(user);
-			usuari = restoreUsuari(usuari);
-			restoreDades (usuari, dades);
-			restoreAccounts (usuari, accounts);	
-			restoreGroups (usuari, groups);
-			restoreRoles (usuari, accounts, roleGrants);
+			user = restoreUser(user);
+			restoreDades (user, dades);
+			restoreAccounts (user, accounts);	
+			restoreGroups (user, groups);
+			restoreRoles (user, accounts, roleGrants);
 		} finally {
 			Security.nestedLogoff();
 		}
@@ -328,32 +338,32 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			return o1.equals(o2);
 	}
 
-	private void restoreRoles(Usuari usuari, List<UserAccount> accounts, List<RolAccount> roleGrants) throws InternalErrorException {
-		LinkedList<RolAccount> currentGrants = new LinkedList<RolAccount>();
+	private void restoreRoles(User User, List<UserAccount> accounts, List<RoleAccount> roleGrants) throws InternalErrorException {
+		LinkedList<RoleAccount> currentGrants = new LinkedList<RoleAccount>();
 		for (UserAccount account:accounts)
 		{
-			currentGrants.addAll ( getAplicacioService().findRolAccountByAccount(account.getId()));
+			currentGrants.addAll ( getApplicationService().findRoleAccountByAccount(account.getId()));
 		}
 		//
-		// Update existing roleUsuari
+		// Update existing roleUser
 		//
-		for (Iterator<RolAccount> it = currentGrants.iterator(); it.hasNext();)
+		for (Iterator<RoleAccount> it = currentGrants.iterator(); it.hasNext();)
 		{
-			RolAccount currentRolAccount = it.next();
+			RoleAccount currentRoleAccount = it.next();
 			String currentDomainValue = null;
-			if (currentRolAccount.getValorDomini() != null)
-				currentDomainValue = currentRolAccount.getValorDomini().getValor();
+			if (currentRoleAccount.getDomainValue() != null)
+				currentDomainValue = currentRoleAccount.getDomainValue().getValue();
 			// Find data on backup
-			for (Iterator<RolAccount> it2 = roleGrants.iterator(); it2.hasNext();)
+			for (Iterator<RoleAccount> it2 = roleGrants.iterator(); it2.hasNext();)
 			{
-				RolAccount rolAccount = it2.next();
+				RoleAccount RoleAccount = it2.next();
 				String domainValue = null;
-				if (rolAccount.getValorDomini() != null)
-					domainValue = rolAccount.getValorDomini().getValor();
-				if (currentRolAccount.getAccountName().equals( rolAccount.getAccountName()) &&
-						currentRolAccount.getNomRol().equals(rolAccount.getNomRol()) &&
-						currentRolAccount.getBaseDeDades().equals (rolAccount.getBaseDeDades()) &&
-						currentRolAccount.getAccountDispatcher().equals(rolAccount.getAccountDispatcher()) &&
+				if (RoleAccount.getDomainValue() != null)
+					domainValue = RoleAccount.getDomainValue().getValue();
+				if (currentRoleAccount.getAccountName().equals( RoleAccount.getAccountName()) &&
+						currentRoleAccount.getRoleName().equals(RoleAccount.getRoleName()) &&
+						currentRoleAccount.getSystem().equals (RoleAccount.getSystem()) &&
+						currentRoleAccount.getAccountSystem().equals(RoleAccount.getAccountSystem()) &&
 						nullCompare (domainValue, currentDomainValue) )
 				{
 					it2.remove();
@@ -364,51 +374,51 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		}
 			
 		//
-		// Remove old rolAccount
+		// Remove old RoleAccount
 		//
-		for (Iterator<RolAccount> it = currentGrants.iterator(); it.hasNext();)
+		for (Iterator<RoleAccount> it = currentGrants.iterator(); it.hasNext();)
 		{
-			RolAccount currentRolAccount = it.next();
-			getAplicacioService().delete(currentRolAccount);
+			RoleAccount currentRoleAccount = it.next();
+			getApplicationService().delete(currentRoleAccount);
 		}
 		// Create new role accounts
-		for (Iterator<RolAccount> it2 = roleGrants.iterator(); it2.hasNext();)
+		for (Iterator<RoleAccount> it2 = roleGrants.iterator(); it2.hasNext();)
 		{
-			RolAccount rolAccount = it2.next();
-			Collection<Rol> roles = getAplicacioService().
-					findRolsByFiltre(rolAccount.getNomRol(), "%", "%", rolAccount.getBaseDeDades(), "%", "%");
+			RoleAccount RoleAccount = it2.next();
+			Collection<Role> roles = getApplicationService().
+					findRolesByFilter(RoleAccount.getRoleName(), "%", "%", RoleAccount.getSystem(), "%", "%");
 			if (roles.size() != 1)
 				throw new InternalErrorException (
 						String.format("Role %s@%s not found", 
-								rolAccount.getNomRol(), rolAccount.getBaseDeDades()));
-			Rol rol = roles.iterator().next();
+								RoleAccount.getRoleName(), RoleAccount.getSystem()));
+			Role rol = roles.iterator().next();
 
-			if (rolAccount.getValorDomini() != null)
-				rolAccount.getValorDomini().setNomDomini(rol.getDomini().getNom());
+			if (RoleAccount.getDomainValue() != null)
+				RoleAccount.getDomainValue().setDomainName(rol.getDomain().getName());
 			for (UserAccount account:accounts)
 			{
-				if (account.getName().equals (rolAccount.getAccountName()) &&
-						account.getDispatcher().equals(rolAccount.getAccountDispatcher()))
-					rolAccount.setAccountId(account.getId());
+				if (account.getName().equals (RoleAccount.getAccountName()) &&
+						account.getSystem().equals(RoleAccount.getAccountSystem()))
+					RoleAccount.setAccountId(account.getId());
 			}
-			rolAccount.setCodiAplicacio(rol.getCodiAplicacio());
-			getAplicacioService().create(rolAccount);
+			RoleAccount.setInformationSystemName(rol.getInformationSystemName());
+			getApplicationService().create(RoleAccount);
 		}			
 	}
 
-	private void restoreGroups(Usuari usuari, List<String> groups) throws InternalErrorException {
-		Collection<UsuariGrup> currentGroups = getGrupService().findUsuariGrupsByCodiUsuari(usuari.getCodi());
+	private void restoreGroups(User user, List<String> groups) throws InternalErrorException {
+		Collection<GroupUser> currentGroups = getGroupService().findUsersGroupByUserName(user.getUserName());
 		//
 		// Update existing accodataunts
 		//
-		for (Iterator<UsuariGrup> it = currentGroups.iterator(); it.hasNext();)
+		for (Iterator<GroupUser> it = currentGroups.iterator(); it.hasNext();)
 		{
-			UsuariGrup currentGroup = it.next();
+			GroupUser currentGroup = it.next();
 			// Find data on backup
 			for (Iterator<String> it2 = groups.iterator(); it2.hasNext();)
 			{
 				String group = it2.next();
-				if (currentGroup.getCodiGrup().equals (group))
+				if (currentGroup.getGroup().equals (group))
 				{
 					it2.remove();
 					it.remove();
@@ -420,36 +430,36 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		//
 		// Remove old accounts
 		//
-		for (Iterator<UsuariGrup> it = currentGroups.iterator(); it.hasNext();)
+		for (Iterator<GroupUser> it = currentGroups.iterator(); it.hasNext();)
 		{
-			UsuariGrup currentGroup = it.next();
+			GroupUser currentGroup = it.next();
 			// Find account on backup
-			getGrupService().delete(currentGroup);
+			getGroupService().delete(currentGroup);
 		}
 		// Create new group
 		for (Iterator<String> it2 = groups.iterator(); it2.hasNext();)
 		{
 			String group = it2.next();
-			getGrupService().addGrupToUsuari(usuari.getCodi(), group);
+			getGroupService().addGroupToUser(user.getUserName(), group);
 		}			
 	}
 
-	private void restoreDades(Usuari usuari, List<DadaUsuari> dades) throws InternalErrorException {
-		Collection<DadaUsuari> currentDatas = getUsuariService().findDadesUsuariByCodiUsuari(usuari.getCodi());
+	private void restoreDades(User user, List<UserData> dades) throws InternalErrorException {
+		Collection<UserData> currentDatas = getUserService().findUserDataByUserName(user.getUserName());
 		//
 		// Update existing accodataunts
 		//
-		for (Iterator<DadaUsuari> it = currentDatas.iterator(); it.hasNext();)
+		for (Iterator<UserData> it = currentDatas.iterator(); it.hasNext();)
 		{
-			DadaUsuari currentData = it.next();
+			UserData currentData = it.next();
 			// Find data on backup
-			for (Iterator<DadaUsuari> it2 = dades.iterator(); it2.hasNext();)
+			for (Iterator<UserData> it2 = dades.iterator(); it2.hasNext();)
 			{
-				DadaUsuari dada = it2.next();
-				if (currentData.getCodiDada().equals (dada.getCodiDada()))
+				UserData dada = it2.next();
+				if (currentData.getAttribute().equals (dada.getAttribute()))
 				{
-					currentData.setValorDada(dada.getValorDada());
-					getDadesAddicionalsService().update(currentData);
+					currentData.setValue(dada.getValue());
+					getAdditionalDataService().update(currentData);
 					it2.remove();
 					it.remove();
 					break;
@@ -460,24 +470,24 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		//
 		// Remove old accounts
 		//
-		for (Iterator<DadaUsuari> it = currentDatas.iterator(); it.hasNext();)
+		for (Iterator<UserData> it = currentDatas.iterator(); it.hasNext();)
 		{
-			DadaUsuari currentData = it.next();
-			getDadesAddicionalsService().delete(currentData);
+			UserData currentData = it.next();
+			getAdditionalDataService().delete(currentData);
 		}
 		// Create new accounts
-		for (Iterator<DadaUsuari> it2 = dades.iterator(); it2.hasNext();)
+		for (Iterator<UserData> it2 = dades.iterator(); it2.hasNext();)
 		{
-			DadaUsuari dada = it2.next();
-			dada.setCodiDada(usuari.getCodi());
-			getDadesAddicionalsService().create(dada);
+			UserData dada = it2.next();
+			dada.setUser(user.getUserName());
+			getAdditionalDataService().create(dada);
 		}			
 			
 	}
 
-	private void restoreAccounts(Usuari usuari, List<UserAccount> accounts) throws InternalErrorException, AccountAlreadyExistsException, NeedsAccountNameException {
+	private void restoreAccounts(User user, List<UserAccount> accounts) throws InternalErrorException, AccountAlreadyExistsException, NeedsAccountNameException {
 		accounts = new LinkedList<UserAccount>(accounts);
-		Collection<UserAccount> currentAccounts = getAccountService().getUserAccounts(usuari);
+		Collection<UserAccount> currentAccounts = getAccountService().getUserAccounts(user);
 		//
 		// Update existing accounts
 		//
@@ -489,7 +499,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			{
 				UserAccount account = it2.next();
 				if (currentAccount.getName().equals (account.getName()) &&
-						currentAccount.getDispatcher().equals(account.getDispatcher()))
+						currentAccount.getSystem().equals(account.getSystem()))
 				{
 					if (currentAccount.isDisabled() != account.isDisabled())
 					{
@@ -517,29 +527,29 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		for (Iterator<UserAccount> it2 = accounts.iterator(); it2.hasNext();)
 		{
 			UserAccount account = it2.next();
-			Dispatcher dispatcher = getDispatcherService().findDispatcherByCodi(account.getDescription());
-			UserAccount newAccount = getAccountService().createAccount(usuari, dispatcher, account.getName());
+			System system = getDispatcherService().findDispatcherByName(account.getDescription());
+			UserAccount newAccount = getAccountService().createAccount(user, system, account.getName());
 			account.setId(newAccount.getId());
 		}			
 			
 	}
 
-	private Usuari restoreUsuari(Usuari usuari) throws InternalErrorException {
-		Usuari currentUsuari = getUsuariService().findUsuariByCodiUsuari(usuari.getCodi());
-		if (currentUsuari == null)
+	private User restoreUser(User user) throws InternalErrorException {
+		User currentUser = getUserService().findUserByUserName(user.getUserName());
+		if (currentUser == null)
 		{
-			usuari.setId(null);
-			usuari = getUsuariService().create(usuari);
+			user.setId(null);
+			user = getUserService().create(user);
 		}
 		else
 		{
-			usuari.setId(currentUsuari.getId());
-			usuari = getUsuariService().update(usuari);
+			user.setId(currentUser.getId());
+			user = getUserService().update(user);
 		}
-		return usuari;
+		return user;
 	}
 
-	private void parseDada(Node dadaElement, DadaUsuari dada) throws InternalErrorException {
+	private void parseDada(Node dadaElement, UserData dada) throws InternalErrorException {
 		NodeList children = dadaElement.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++)
 		{
@@ -548,9 +558,9 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			{
 				String tag = ((Element) child).getTagName();
 				if (TAG.equals(tag))
-					dada.setCodiDada(child.getTextContent());
+					dada.setAttribute(child.getTextContent());
 				else if (VALUE.equals(tag))
-					dada.setValorDada(child.getTextContent());
+					dada.setValue(child.getTextContent());
 				else
 					throw new InternalErrorException (String.format("Unexpected tag %s", tag));
 			}
@@ -570,7 +580,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		}
 	}
 
-	private void parseAccount(Node accountElement, UserAccount account, List<RolAccount> roleGrants) throws SecurityException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, DOMException, ParseException, InternalErrorException {
+	private void parseAccount(Node accountElement, UserAccount account, List<RoleAccount> roleGrants) throws SecurityException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, DOMException, ParseException, InternalErrorException {
 		NodeList children = accountElement.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++)
 		{
@@ -581,13 +591,13 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 				if (NAME.equals(tag))
 					account.setName(child.getTextContent());
 				else if (SYSTEM.equals(tag))
-					account.setDispatcher(child.getTextContent());
+					account.setSystem(child.getTextContent());
 				else if (ROLE.equals(tag))
 				{
-					RolAccount roleAccount = new RolAccount();
+					RoleAccount roleAccount = new RoleAccount();
 					roleGrants.add(roleAccount);
 					roleAccount.setAccountName(account.getName());
-					roleAccount.setAccountDispatcher(account.getDispatcher());
+					roleAccount.setAccountSystem(account.getSystem());
 					parseRoleAccount (child, roleAccount);
 				}
 				else
@@ -596,7 +606,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		}
 	}
 
-	private void parseRoleAccount(Node roleElement, RolAccount roleAccount) throws InternalErrorException {
+	private void parseRoleAccount(Node roleElement, RoleAccount roleAccount) throws InternalErrorException {
 		NodeList children = roleElement.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++)
 		{
@@ -605,13 +615,13 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			{
 				String tag = ((Element) child).getTagName();
 				if (NAME.equals(tag))
-					roleAccount.setNomRol(child.getTextContent());
+					roleAccount.setRoleName(child.getTextContent());
 				else if (SYSTEM.equals(tag))
-					roleAccount.setBaseDeDades(child.getTextContent());
+					roleAccount.setSystem(child.getTextContent());
 				else if (DOMAIN.equals(tag))
 				{
-					roleAccount.setValorDomini(new ValorDomini());
-					roleAccount.getValorDomini().setValor(child.getTextContent());
+					roleAccount.setDomainValue(new DomainValue());
+					roleAccount.getDomainValue().setValue(child.getTextContent());
 				}
 				else
 					throw new InternalErrorException (String.format("Unexpected tag %s", tag));
@@ -699,10 +709,10 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 	@Override
 	protected List<UserBackup> handleGetUserBackups(Long userId)
 			throws Exception {
-		UsuariEntity user = getUsuariEntityDao().load(userId);
+		UserEntity user = getUserEntityDao().load(userId);
 		if (user == null)
 			Collections.emptyList();
-		List<UserBackupEntity> entities = getUserBackupEntityDao().findByUser(user.getCodi());
+		List<UserBackupEntity> entities = getUserBackupEntityDao().findByUser(user.getUserName());
 		for (Iterator<UserBackupEntity> it = entities.iterator(); it.hasNext();)
 		{
 			if (it.next().getValidUntil() == null)
@@ -722,29 +732,29 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 	@Override
 	protected UserBackupConfig handleGetConfig() throws Exception {
 		UserBackupConfig cfg = new UserBackupConfig();
-		cfg.setCmdToExecute(System.getProperty("addon.backup.cmd"));
-		cfg.setFullBackupDir(System.getProperty("addon.backup.fullBackupDir"));
+		cfg.setCmdToExecute(ConfigurationCache.getProperty("addon.backup.cmd"));
+		cfg.setFullBackupDir(ConfigurationCache.getProperty("addon.backup.fullBackupDir"));
 		try {
-			cfg.setFullBackupHour(Integer.decode(System.getProperty("addon.backup.hour")));
+			cfg.setFullBackupHour(Integer.decode(ConfigurationCache.getProperty("addon.backup.hour")));
 		} catch (Exception e) {}
 		
 		if (cfg.getFullBackupHour() == null)
 			cfg.setFullBackupHour(0);
 		
 		try {
-			cfg.setFullBackupMinute(Integer.decode(System.getProperty("addon.backup.minute")));
+			cfg.setFullBackupMinute(Integer.decode(ConfigurationCache.getProperty("addon.backup.minute")));
 		} catch (Exception e) {}
 		if (cfg.getFullBackupMinute() == null)
 			cfg.setFullBackupMinute(0);
 		
 		try {
-			cfg.setUserBackupCopies(Integer.decode(System.getProperty("addon.backup.copies")));
+			cfg.setUserBackupCopies(Integer.decode(ConfigurationCache.getProperty("addon.backup.copies")));
 		} catch (Exception e) {}
 		if (cfg.getUserBackupCopies() == null)
 			cfg.setUserBackupCopies(10);
 		
 		try {
-			cfg.setUserBackupDelay(Long.decode(System.getProperty("addon.backup.delay")));
+			cfg.setUserBackupDelay(Long.decode(ConfigurationCache.getProperty("addon.backup.delay")));
 		} catch (Exception e) {}
 		if (cfg.getUserBackupDelay() == null)
 			cfg.setUserBackupDelay(300L);
@@ -765,24 +775,24 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 	private void updateConfig (String tag, Object value) throws InternalErrorException
 	{
 		String sValue = value == null ? null: value.toString();
-		ConfiguracioService cfgSvc = getConfiguracioService();
-		Configuracio v = cfgSvc.findParametreByCodiAndCodiXarxa(tag, null);
+		com.soffid.iam.service.ConfigurationService cfgSvc = getConfigurationService();
+		Configuration v = cfgSvc.findParameterByNameAndNetworkName(tag, null);
 		if (v != null)
 		{
 			if (sValue == null)
 				cfgSvc.delete(v);
 			else
 			{
-				v.setValor(sValue);
+				v.setValue(sValue);
 				cfgSvc.update(v);
 			}
 		}
 		else if (sValue != null)
 		{
-			v = new Configuracio();
-			v.setCodi(tag);
-			v.setValor(sValue);
-			v.setDescripcio("Backup addon parameter");
+			v = new Configuration();
+			v.setCode(tag);
+			v.setValue(sValue);
+			v.setDescription("Backup addon parameter");
 			cfgSvc.create(v);
 		}
 		
