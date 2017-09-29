@@ -100,7 +100,7 @@
 		<dependency>
 			<groupId>com.soffid.zkib</groupId>
 			<artifactId>zkiblaf</artifactId>
-			<version>1.10</version>
+			<version>1.21</version>
 			<classifier>classes</classifier>
 			<scope>provided</scope>
 		</dependency>
