@@ -238,6 +238,6 @@
 		</dependencies>
 	</dependencyManagement>
 	<properties>
-		<console.version>2.0.0-SNAPSHOT</console.version>
+		<console.version>2.0.0</console.version>
 	</properties>
 </project>
