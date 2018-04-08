@@ -10,7 +10,7 @@
 	<artifactId>backup</artifactId>
 	<packaging>pom</packaging>
 	<name>User backup addon</name>
-	<version>2.0.0</version>
+	<version>2.0.1-SNAPSHOT</version>
 	<description>SOFFID IAM Backup addon</description>
 	<prerequisites>
 		<maven>2.0.1</maven>
@@ -238,6 +238,6 @@
 		</dependencies>
 	</dependencyManagement>
 	<properties>
-		<console.version>2.0.0-SNAPSHOT</console.version>
+		<console.version>2.0.0</console.version>
 	</properties>
 </project>
