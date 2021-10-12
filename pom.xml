@@ -10,7 +10,7 @@
 	<artifactId>backup</artifactId>
 	<packaging>pom</packaging>
 	<name>User backup addon</name>
-	<version>3.0.0</version>
+	<version>3.0.1-SNAPSHOT</version>
 	<description>SOFFID IAM Backup addon</description>
 	<prerequisites>
 		<maven>2.0.1</maven>
@@ -18,7 +18,7 @@
 	<scm>
 		<connection>scm:git:ssh://git@stash.dev.lab:7999/iam2/addon-backup.git</connection>
 		<developerConnection>scm:git:ssh://git@stash.dev.lab:7999/iam2/addon-backup.git</developerConnection>
-		  <tag>backup-3.0.0</tag>
+		  <tag>backup-2.0.0</tag>
   	</scm>
 	<build>
 		<defaultGoal>install</defaultGoal>
