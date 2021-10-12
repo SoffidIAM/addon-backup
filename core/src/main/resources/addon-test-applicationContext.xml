@@ -4,7 +4,7 @@
 <beans>
 
 	<!-- ========================= Interceptors ========================= -->
-	<bean id="tasqueEntityDaoInterceptor-Backup" class="com.soffid.iam.addons.backup.interceptor.BackupInterceptor" singleton="true">
+	<bean id="taskEntityDaoInterceptor-Backup" class="com.soffid.iam.addons.backup.interceptor.BackupInterceptor" singleton="true">
 		<property name="sessionFactory"><ref bean="sessionFactory"/></property>
 		<property name="userBackupService"><ref bean="backup-userBackupService"/></property>
 	</bean>

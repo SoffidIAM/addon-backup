@@ -1,7 +1,5 @@
 package com.soffid.addons.backup.test;
 
-import java.util.Collection;
-
 import org.jfree.util.Log;
 
 import com.soffid.iam.addons.backup.common.UserBackup;
@@ -9,30 +7,11 @@ import com.soffid.iam.addons.backup.common.UserBackupConfig;
 import com.soffid.iam.addons.backup.service.UserBackupService;
 import com.soffid.test.AbstractHibernateTest;
 
-import es.caib.seycon.ng.ServiceLocator;
 import es.caib.seycon.ng.comu.Account;
-import es.caib.seycon.ng.comu.AccountType;
-import es.caib.seycon.ng.comu.Aplicacio;
-import es.caib.seycon.ng.comu.AutoritzacioRol;
-import es.caib.seycon.ng.comu.Configuracio;
-import es.caib.seycon.ng.comu.Dispatcher;
-import es.caib.seycon.ng.comu.Domini;
-import es.caib.seycon.ng.comu.DominiContrasenya;
-import es.caib.seycon.ng.comu.DominiUsuari;
-import es.caib.seycon.ng.comu.Grup;
-import es.caib.seycon.ng.comu.Maquina;
-import es.caib.seycon.ng.comu.OsType;
-import es.caib.seycon.ng.comu.PoliticaContrasenya;
 import es.caib.seycon.ng.comu.Rol;
 import es.caib.seycon.ng.comu.RolAccount;
-import es.caib.seycon.ng.comu.TipusDada;
-import es.caib.seycon.ng.comu.TipusDominiUsuariEnumeration;
-import es.caib.seycon.ng.comu.TipusUsuari;
-import es.caib.seycon.ng.comu.UserAccount;
 import es.caib.seycon.ng.comu.Usuari;
 import es.caib.seycon.ng.comu.UsuariGrup;
-import es.caib.seycon.ng.comu.Xarxa;
-import es.caib.seycon.ng.exception.AccountAlreadyExistsException;
 import es.caib.seycon.ng.exception.InternalErrorException;
 import es.caib.seycon.ng.exception.NeedsAccountNameException;
 import es.caib.seycon.ng.servei.AccountService;
@@ -69,6 +48,7 @@ public class BackupTest extends AbstractHibernateTest {
 	protected InternalPasswordService internalPassSvc;
 	protected UserBackupService backupSvc;
 
+	
 	public void setupdb() throws InternalErrorException,
 			NeedsAccountNameException
 	{ 
