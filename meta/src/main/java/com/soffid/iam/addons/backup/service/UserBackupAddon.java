@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service ( internal=true,
 	 translatedName="UserBackupAddon",
 	 translatedPackage="com.soffid.iam.addons.backup.service")
-public abstract class UserBackupAddon {
+public class UserBackupAddon {
 
 	@Transactional(rollbackFor={java.lang.Exception.class})
 	public void performBackup(

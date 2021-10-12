@@ -12,6 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service ( translatedName="BackupBootstrapService",
 	 translatedPackage="com.soffid.iam.addons.backup.service")
 @Depends ({com.soffid.iam.addons.backup.service.UserBackupService.class})
-public abstract class BackupBootstrapService extends es.caib.seycon.ng.servei.ApplicationBootService {
+public class BackupBootstrapService extends es.caib.seycon.ng.servei.ApplicationBootService {
 
 }

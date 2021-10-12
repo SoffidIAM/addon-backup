@@ -9,11 +9,9 @@
 
 		<finder name="backup" type="backup" refreshAfterCommit="false">
 			<ejb-finder jndi="openejb:/local/soffid.ejb.com.soffid.iam.addons.backup.service.UserBackupService"
-				method="findBackup"
-				if="${queryEnabled}">
-				<parameter value="${user}" />
-				<parameter value="${date}" />
-				<parameter value="${freeText}" />
+				method="findUserBackupByJsonQueryAsync"
+				if="${query != null}">
+				<parameter value="${query}" />
 			</ejb-finder>
 		</finder>
 	</datanode>

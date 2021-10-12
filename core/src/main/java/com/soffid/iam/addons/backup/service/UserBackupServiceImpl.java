@@ -1,7 +1,7 @@
 package com.soffid.iam.addons.backup.service;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -13,14 +13,18 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.beanutils.PropertyUtils;
+import org.json.JSONException;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -33,21 +37,33 @@ import org.w3c.dom.NodeList;
 import com.soffid.iam.addons.backup.common.UserBackup;
 import com.soffid.iam.addons.backup.common.UserBackupConfig;
 import com.soffid.iam.addons.backup.model.UserBackupEntity;
+import com.soffid.iam.addons.backup.model.UserBackupEntityDao;
+import com.soffid.iam.api.Account;
+import com.soffid.iam.api.AccountStatus;
+import com.soffid.iam.api.AsyncList;
 import com.soffid.iam.api.Configuration;
+import com.soffid.iam.api.DataType;
 import com.soffid.iam.api.DomainValue;
 import com.soffid.iam.api.GroupUser;
+import com.soffid.iam.api.PagedResult;
 import com.soffid.iam.api.Role;
 import com.soffid.iam.api.RoleAccount;
+import com.soffid.iam.api.System;
 import com.soffid.iam.api.User;
 import com.soffid.iam.api.UserAccount;
 import com.soffid.iam.api.UserData;
-import com.soffid.iam.api.System;
+import com.soffid.iam.bpm.service.scim.ScimHelper;
 import com.soffid.iam.model.AccountEntity;
 import com.soffid.iam.model.UserAccountEntity;
+import com.soffid.iam.model.UserDataEntity;
 import com.soffid.iam.model.UserEntity;
+import com.soffid.iam.model.criteria.CriteriaSearchConfiguration;
 import com.soffid.iam.utils.ConfigurationCache;
+import com.soffid.scimquery.EvalException;
+import com.soffid.scimquery.parser.TokenMgrError;
 
 import es.caib.seycon.ng.comu.AccountType;
+import es.caib.seycon.ng.comu.TypeEnumeration;
 import es.caib.seycon.ng.exception.AccountAlreadyExistsException;
 import es.caib.seycon.ng.exception.InternalErrorException;
 import es.caib.seycon.ng.exception.NeedsAccountNameException;
@@ -61,12 +77,15 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 	private static final String CUSTOM_DATA = "customData";
 	private static final String GROUP_MEMBERSHIP = "groupMembership";
 	private static final String DOMAIN = "domain";
+	private static final String HOLDER_GROUP="holderGroup";
 	private static final String SYSTEM = "system";
 	private static final String NAME = "name";
 	private static final String ROLE = "role";
 	private static final String ACCOUNT = "account";
 	private static final String USER = "user";
 	private static final String USER_BACKUP = "user-backup";
+	private static final String ATTRIBUTES = "attributes";
+	private static final String STATUS = "status";
 	DateFormat dateformat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	private ApplicationContext applicationContext;
 			
@@ -83,13 +102,12 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		} finally {
 			Security.nestedLogoff();
 		}
-		long order = 0;
+
 		Date now = new Date();
 		List<UserBackupEntity> oldBackups = getUserBackupEntityDao().findByUser(user.getUserName());
 		
 		// Sort from high to low
 		Collections.sort(oldBackups, new Comparator<UserBackupEntity>() {
-
 			public int compare(UserBackupEntity o1, UserBackupEntity o2) {
 				return o2.getOrder().compareTo(o1.getOrder());
 			}
@@ -104,8 +122,11 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 				return ;
 			if (now.getTime() - last.getBackupDate().getTime() <  config.getUserBackupDelay() * 1000)
 			{
-				last.setData(xml);
-				getUserBackupEntityDao().update(last);
+				if (last.getValidUntil() == null)
+				{
+					last.setValidUntil(new Date());
+					getUserBackupEntityDao().update(last);
+				}
 				return;
 			}
 		}
@@ -153,23 +174,29 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		
 		serialize (sb, 0, USER_BACKUP, null, false);
 		User user = getUserEntityDao().toUser(userEntity);
-		
+
 		serialize (sb, 2, USER, user, true);
+
+		serializeAttributes(sb, 2, userEntity.getUserData());
 		
-		for (UserAccount account: getAccountService().getUserAccounts(user))
+		for (Account account: getAccountService().getUserAccounts(user))
 		{
-			if (!account.isDisabled())
+			if (account.getType().equals(AccountType.USER) && !account.isDisabled())
 			{
 				serialize (sb, 2, ACCOUNT, null, false);
 				serialize (sb, 4, NAME, account.getName(), true);
 				serialize (sb, 4, SYSTEM, account.getSystem(), true);
-				for (RoleAccount RoleAccount: getApplicationService().findRoleAccountByAccount(account.getId()))
+				serialize (sb, 4, STATUS, account.getStatus().toString(), true);
+				serializeAccountAttributes (sb, 4, account.getAttributes());
+				for (RoleAccount roleAccount: getApplicationService().findRoleAccountByAccount(account.getId()))
 				{
 					serialize (sb, 4, ROLE, null, false);
-					serialize (sb, 6, NAME, RoleAccount.getRoleName(), true);
-					serialize (sb, 6, SYSTEM, RoleAccount.getSystem(), true);
-					if (RoleAccount.getDomainValue() != null)
-						serialize (sb, 6, DOMAIN, RoleAccount.getDomainValue().getValue(), true);
+					serialize (sb, 6, NAME, roleAccount.getRoleName(), true);
+					serialize (sb, 6, SYSTEM, roleAccount.getSystem(), true);
+					if (roleAccount.getDomainValue() != null)
+						serialize (sb, 6, DOMAIN, roleAccount.getDomainValue().getValue(), true);
+					if (roleAccount.getHolderGroup() != null)
+						serialize (sb, 6, HOLDER_GROUP, roleAccount.getHolderGroup(), true);
 					closeTag (sb, 4, ROLE);
 				}
 				closeTag (sb, 2, ACCOUNT);
@@ -178,23 +205,66 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		
 		for (GroupUser userGrup: getGroupService().findUsersGroupByUserName(userEntity.getUserName()))
 		{
-			serialize (sb, 2, GROUP_MEMBERSHIP, userGrup.getGroup(), true);
-		}
-		
-		for (UserData dada: getUserService().findUserDataByUserName(userEntity.getUserName()))
-		{
-			if (dada.getValue() != null)
-			{
-				serialize (sb, 2, CUSTOM_DATA, null, false);
-				serialize (sb, 4, TAG, dada.getAttribute(), true);
-				serialize (sb, 4, VALUE, dada.getValue(), true);
-				closeTag(sb, 2, CUSTOM_DATA);
+			if (! Boolean.TRUE.equals(userGrup.getDisabled())) {
+				serialize (sb, 2, GROUP_MEMBERSHIP, null, false);
+				serialize (sb, 4, NAME, userGrup.getGroup(), true);
+				serialize (sb, 4, "start", userGrup.getStart(), true);
+				serialize (sb, 4, "end", userGrup.getEnd(), true);
+				serializeAccountAttributes (sb, 4, userGrup.getAttributes());
+				closeTag(sb, 2, GROUP_MEMBERSHIP);
 			}
 		}
-
+		
 		closeTag (sb, 0, USER_BACKUP);
 		
 		return sb.toString();
+	}
+
+	private void serializeAttributes(StringBuffer sb, int i, Collection<UserDataEntity> collection) {
+		startTag(sb, i, ATTRIBUTES);
+		for (UserDataEntity data: collection)
+		{
+			serialize(sb, i+2, CUSTOM_DATA, null, false);
+			serialize(sb, i+4, "name", data.getDataType().getName(), true);
+			if (data.getBlobDataValue() != null)
+				serialize(sb, i+4, "blobDataValue", data.getBlobDataValue(), true);
+			else
+				serialize(sb, i+4, "value", data.getValue(), true);
+			closeTag(sb, i+2, CUSTOM_DATA);
+		}
+		closeTag(sb, i, ATTRIBUTES);
+	}
+
+	private void serializeAccountAttributes(StringBuffer sb, int i, Map<String,Object> attributes) {
+		startTag(sb, i, ATTRIBUTES);
+		for (Entry<String, Object> entry: attributes.entrySet())
+		{
+			if (entry.getValue() != null)
+			{
+				serialize (sb, i+2, entry.getKey(), null, false);
+				Object v = entry.getValue();
+				if ( v instanceof Collection)
+					for (Object vv: (Collection) v)
+						serializeAttributeValue(sb, i, vv);
+				else
+					serializeAttributeValue(sb, i, v);
+				closeTag(sb, i+2, entry.getKey());
+			}
+		}
+		closeTag(sb, i, ATTRIBUTES);
+	}
+
+	private void serializeAttributeValue(StringBuffer sb, int i, Object v) {
+		if (v == null)
+			return;
+		else if (v instanceof Date)
+			serialize (sb, i+4, "dateValue", v, true);
+		else if (v instanceof Calendar)
+			serialize (sb, i+4, "calendarValue", v, true);
+		else if (v instanceof byte [])
+			serialize (sb, i+4, "blobValue", v, true);
+		else
+			serialize (sb, i+4, "stringValue", v.toString(), true);
 	}
 
 	private void closeTag (StringBuffer sb, int indent, String tag)
@@ -204,6 +274,15 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		sb.append ("</").append(tag).append(">");
 		sb.append ('\n');
 	}
+
+	private void startTag (StringBuffer sb, int indent, String tag)
+	{
+		for (int i = 0; i < indent; i++)
+			sb.append (' ');
+		sb.append ("<").append(tag).append(">");
+		sb.append ('\n');
+	}
+
 	private void serialize(StringBuffer sb, int indent, String tag, Object obj, boolean closeTag) {
 		for (int i = 0; i < indent; i++)
 			sb.append (' ');
@@ -279,8 +358,8 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		User user = new User();
 		List<UserAccount> accounts = new LinkedList<UserAccount>();
 		List<RoleAccount> roleGrants = new LinkedList<RoleAccount>();
-		List<String> groups = new LinkedList<String>();
-		List<UserData> dades = new LinkedList<UserData>();
+		List<GroupUser> groups = new LinkedList<GroupUser>();
+		List<UserData> attributes = new LinkedList<UserData>();
 		
 		NodeList children = update.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++)
@@ -299,12 +378,10 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 					accounts.add(account);
 				}
 				else if (tag.equals (GROUP_MEMBERSHIP))
-					groups.add (child.getTextContent());
-				else if (tag.equals (CUSTOM_DATA))
+					parseGroup (child, user.getUserName(), groups);
+				else if (tag.equals (ATTRIBUTES))
 				{
-					UserData dada = new UserData ();
-					parseDada (child, dada);
-					dades.add (dada);
+					parseAttributes (child, attributes);
 				}
 				else
 				{
@@ -316,7 +393,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		Security.nestedLogin(Security.getCurrentAccount(), Security.ALL_PERMISSIONS);
 		try {
 			user = restoreUser(user);
-			restoreDades (user, dades);
+			restoreAttributes (user, attributes);
 			restoreAccounts (user, accounts);	
 			restoreGroups (user, groups);
 			restoreRoles (user, accounts, roleGrants);
@@ -379,7 +456,8 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		for (Iterator<RoleAccount> it = currentGrants.iterator(); it.hasNext();)
 		{
 			RoleAccount currentRoleAccount = it.next();
-			getApplicationService().delete(currentRoleAccount);
+			if (currentRoleAccount.getRuleId() == null)
+				getApplicationService().delete(currentRoleAccount);
 		}
 		// Create new role accounts
 		for (Iterator<RoleAccount> it2 = roleGrants.iterator(); it2.hasNext();)
@@ -394,7 +472,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			Role rol = roles.iterator().next();
 
 			if (RoleAccount.getDomainValue() != null)
-				RoleAccount.getDomainValue().setDomainName(rol.getDomain().getName());
+				RoleAccount.getDomainValue().setDomainName(rol.getDomain());
 			for (UserAccount account:accounts)
 			{
 				if (account.getName().equals (RoleAccount.getAccountName()) &&
@@ -406,7 +484,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		}			
 	}
 
-	private void restoreGroups(User user, List<String> groups) throws InternalErrorException {
+	private void restoreGroups(User user, List<GroupUser> groups) throws InternalErrorException {
 		Collection<GroupUser> currentGroups = getGroupService().findUsersGroupByUserName(user.getUserName());
 		//
 		// Update existing accodataunts
@@ -415,13 +493,15 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		{
 			GroupUser currentGroup = it.next();
 			// Find data on backup
-			for (Iterator<String> it2 = groups.iterator(); it2.hasNext();)
+			for (Iterator<GroupUser> it2 = groups.iterator(); it2.hasNext();)
 			{
-				String group = it2.next();
-				if (currentGroup.getGroup().equals (group))
+				GroupUser group = it2.next();
+				if (currentGroup.getGroup().equals (group.getGroup()))
 				{
 					it2.remove();
 					it.remove();
+					group.setId(currentGroup.getId());
+					getGroupService().update(group);
 					break;
 				}
 			}
@@ -437,51 +517,60 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			getGroupService().delete(currentGroup);
 		}
 		// Create new group
-		for (Iterator<String> it2 = groups.iterator(); it2.hasNext();)
+		for (Iterator<GroupUser> it2 = groups.iterator(); it2.hasNext();)
 		{
-			String group = it2.next();
-			getGroupService().addGroupToUser(user.getUserName(), group);
+			GroupUser group = it2.next();
+			getGroupService().create(group);
 		}			
 	}
 
-	private void restoreDades(User user, List<UserData> dades) throws InternalErrorException {
-		Collection<UserData> currentDatas = getUserService().findUserDataByUserName(user.getUserName());
+	private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy.MM.dd HH.mm.ss"); //$NON-NLS-1$
+	private static final SimpleDateFormat DATE_FORMAT2 = new SimpleDateFormat("yyyy-MM-dd'T'HH.mm.ss"); //$NON-NLS-1$
+	private void restoreAttributes(User user, List<UserData> dades) throws InternalErrorException, ParseException {
 		//
-		// Update existing accodataunts
+		// Update existing data
 		//
-		for (Iterator<UserData> it = currentDatas.iterator(); it.hasNext();)
+		HashMap<String, Object> atts = new HashMap<String, Object>();
+		for (UserData currentData: dades)
 		{
-			UserData currentData = it.next();
-			// Find data on backup
-			for (Iterator<UserData> it2 = dades.iterator(); it2.hasNext();)
+			DataType dt = getAdditionalDataService().findDataTypeByName(currentData.getAttribute());
+			Object o = atts.get(currentData.getAttribute());
+			Object o2 = null;
+			if (currentData.getBlobDataValue() != null)
+				o2 = currentData.getBlobDataValue();
+			else if (currentData.getDateValue() != null)
+				o2 = currentData.getDateValue();
+			else 
 			{
-				UserData dada = it2.next();
-				if (currentData.getAttribute().equals (dada.getAttribute()))
+				o2 = currentData.getValue();
+				if (dt.getType().equals( TypeEnumeration.DATE_TYPE) )
 				{
-					currentData.setValue(dada.getValue());
-					getAdditionalDataService().update(currentData);
-					it2.remove();
-					it.remove();
-					break;
+					try {
+						o2 = DATE_FORMAT2.parse((String) o2);
+					} catch (ParseException e) {
+						try {
+							o2 = DATE_FORMAT.parse((String) o2);
+						} catch (ParseException e2 ) {}
+					}
 				}
 			}
+
+			if (o == null)
+				atts.put(currentData.getAttribute(), o2);
+			else 
+			{
+				if (! (o instanceof List))
+				{
+					List l = new LinkedList();
+					l.add(o);
+					atts.put(currentData.getAttribute(), l);
+					o = l;
+				}
+				((List) o).add( o2 );
+			} 
 		}
-			
-		//
-		// Remove old accounts
-		//
-		for (Iterator<UserData> it = currentDatas.iterator(); it.hasNext();)
-		{
-			UserData currentData = it.next();
-			getAdditionalDataService().delete(currentData);
-		}
-		// Create new accounts
-		for (Iterator<UserData> it2 = dades.iterator(); it2.hasNext();)
-		{
-			UserData dada = it2.next();
-			dada.setUser(user.getUserName());
-			getAdditionalDataService().create(dada);
-		}			
+		
+		getUserService().updateUserAttributes(user.getUserName(), atts);
 			
 	}
 
@@ -527,7 +616,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		for (Iterator<UserAccount> it2 = accounts.iterator(); it2.hasNext();)
 		{
 			UserAccount account = it2.next();
-			System system = getDispatcherService().findDispatcherByName(account.getDescription());
+			System system = getDispatcherService().findDispatcherByName(account.getSystem());
 			UserAccount newAccount = getAccountService().createAccount(user, system, account.getName());
 			account.setId(newAccount.getId());
 		}			
@@ -544,12 +633,34 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		else
 		{
 			user.setId(currentUser.getId());
+			user.setModifiedOn(currentUser.getModifiedOn());
 			user = getUserService().update(user);
 		}
 		return user;
 	}
 
-	private void parseDada(Node dadaElement, UserData dada) throws InternalErrorException {
+	private void parseAttributes(Node dadaElement, List<UserData> attributes) throws InternalErrorException, NoSuchFieldException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, ParseException {
+		NodeList children = dadaElement.getChildNodes();
+		for (int i = 0; i < children.getLength(); i++)
+		{
+			Node child = children.item(i);
+			if (child instanceof Element)
+			{
+				
+				String tag = ((Element) child).getTagName();
+				if (tag.equals(CUSTOM_DATA))
+				{
+					UserData data = new UserData();
+					parseData(data, (Element)child);
+					attributes.add(data);
+				}
+				else
+					throw new InternalErrorException ("Unexpected tag "+tag);
+			}
+		}
+	}
+
+	private void parseData(UserData dada, Node dadaElement) throws InternalErrorException {
 		NodeList children = dadaElement.getChildNodes();
 		for (int i = 0; i < children.getLength(); i++)
 		{
@@ -557,10 +668,14 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 			if (child instanceof Element)
 			{
 				String tag = ((Element) child).getTagName();
-				if (TAG.equals(tag))
+				if (NAME.equals(tag))
 					dada.setAttribute(child.getTextContent());
 				else if (VALUE.equals(tag))
 					dada.setValue(child.getTextContent());
+				else if ("blobDataValue".equals(tag))
+				{
+					dada.setBlobDataValue( Base64.decode( child.getTextContent()) );
+				}
 				else
 					throw new InternalErrorException (String.format("Unexpected tag %s", tag));
 			}
@@ -600,10 +715,92 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 					roleAccount.setAccountSystem(account.getSystem());
 					parseRoleAccount (child, roleAccount);
 				}
+				else if (ATTRIBUTES.equals(tag))
+					account.setAttributes( parseAccountAttributes( child ));
+				else if (STATUS.equals(tag))
+					account.setStatus( AccountStatus.fromString( child.getTextContent()));
 				else
 					throw new InternalErrorException (String.format("Unexpected tag %s", tag));
 			}
 		}
+	}
+
+	private void parseGroup(Node accountElement, String userName, List<GroupUser> groups) throws SecurityException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, DOMException, ParseException, InternalErrorException {
+		NodeList children = accountElement.getChildNodes();
+		GroupUser gu = new GroupUser();
+		groups.add(gu);
+		gu.setUser(userName);
+		gu.setFullName(userName);
+		for (int i = 0; i < children.getLength(); i++)
+		{
+			Node child = children.item(i);
+			if (child instanceof Element)
+			{
+				String tag = ((Element) child).getTagName();
+				if (NAME.equals(tag)) 
+					gu.setGroup(child.getTextContent());
+				else if ("start".equals(tag)) {
+					try {
+						gu.setStart(dateformat.parse(child.getTextContent()));
+					} catch (ParseException e) {}
+				}
+				else if ("end".equals(tag)) {
+					try {
+						gu.setEnd(dateformat.parse(child.getTextContent()));
+					} catch (ParseException e) {}
+				}
+				else if (ATTRIBUTES.equals(tag))
+					gu.setAttributes( parseAccountAttributes( child ));
+				else
+					throw new InternalErrorException (String.format("Unexpected tag %s", tag));
+			}
+		}
+		gu.setGroupDescription(gu.getGroup());
+	}
+
+	private Map<String, Object> parseAccountAttributes(Node dadaElement) throws InternalErrorException, ParseException {
+		HashMap<String, Object> r = new HashMap<String, Object>();
+		NodeList children = dadaElement.getChildNodes();
+		for (int i = 0; i < children.getLength(); i++)
+		{
+			Node child = children.item(i);
+			if (child instanceof Element)
+			{
+				String tag = ((Element) child).getTagName();
+				List<Object> v = new LinkedList();
+				NodeList children2 = child.getChildNodes();
+				for (int j = 0; j < children2.getLength(); j++)
+				{
+					Node child2 = children2.item(j);
+					if (child2 instanceof Element)
+					{
+						String tag2 = ((Element) child2).getTagName();
+						String text = child2.getTextContent(); 
+						if (tag2.equals("dateValue"))
+						{
+							Date d = dateformat.parse(text);
+							v.add(d);
+						}
+						else if (tag2.equals("calendarValue"))
+						{
+							Date d = dateformat.parse(text);
+							Calendar c = Calendar.getInstance();
+							v.add(c);
+						}
+						else if (tag2.equals("blobValue"))
+						{
+							v.add ( Base64.decode(text));
+						}
+						else if (tag2.equals("stringValue"))
+							v.add(text);
+						else
+							throw new InternalErrorException("Unexpected tag "+tag2);
+					}
+				}
+				r.put(tag, v);
+			}
+		}
+		return r;
 	}
 
 	private void parseRoleAccount(Node roleElement, RoleAccount roleAccount) throws InternalErrorException {
@@ -622,6 +819,10 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 				{
 					roleAccount.setDomainValue(new DomainValue());
 					roleAccount.getDomainValue().setValue(child.getTextContent());
+				}
+				else if (HOLDER_GROUP.equals(tag))
+				{
+					roleAccount.setHolderGroup(child.getTextContent());
 				}
 				else
 					throw new InternalErrorException (String.format("Unexpected tag %s", tag));
@@ -758,6 +959,12 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		} catch (Exception e) {}
 		if (cfg.getUserBackupDelay() == null)
 			cfg.setUserBackupDelay(300L);
+
+		cfg.setEnableHistory(false);
+		try {
+			cfg.setEnableHistory("true".equals(ConfigurationCache.getProperty("soffid.history.enabled")));
+		} catch (Exception e) {}
+
 		return cfg;
 	}
 
@@ -769,6 +976,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		updateConfig ("addon.backup.minute", config.getFullBackupMinute());
 		updateConfig ("addon.backup.copies", config.getUserBackupCopies());
 		updateConfig ("addon.backup.delay", config.getUserBackupDelay());
+		updateConfig ("soffid.history.enabled", config.isEnableHistory() ? "true": "false");
 	}
 	
 
@@ -810,5 +1018,59 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		else
 			return backupEntity.getData();
 	}
+
+	@Override
+	protected AsyncList<UserBackup> handleFindUserBackupByJsonQueryAsync(String query) throws Exception {
+		final AsyncList<UserBackup> result = new AsyncList<UserBackup>();
+		getAsyncRunnerService().run(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					doFindUserBackupByJsonQuery(query, null, null, result);
+				} catch (Throwable e) {
+					throw new RuntimeException(e);
+				}				
+			}
+		}, result);
+
+		return result;
+	}
+
+	@Override
+	protected PagedResult<UserBackup> handleFindUserBackupByJsonQuery(String query, Integer first, Integer pageSize)
+			throws Exception {
+		final LinkedList<UserBackup> result = new LinkedList<UserBackup>();
+		PagedResult<UserBackup> pr = doFindUserBackupByJsonQuery(query, first, pageSize, result);
+		return pr;
+	}
+
+
+	private PagedResult<UserBackup> doFindUserBackupByJsonQuery(
+			String query, Integer first,
+			Integer pageSize, List<UserBackup> result) throws UnsupportedEncodingException, ClassNotFoundException, JSONException, InternalErrorException, EvalException, ParseException, TokenMgrError, com.soffid.scimquery.parser.ParseException {
+		final UserBackupEntityDao dao = getUserBackupEntityDao();
+		ScimHelper h = new ScimHelper(UserBackup.class);
+		h.setPrimaryAttributes(new String[] { "userName"});
+		CriteriaSearchConfiguration config = new CriteriaSearchConfiguration();
+		config.setFirstResult(first);
+		config.setMaximumResultSize(pageSize);
+		h.setConfig(config);
+		h.setTenantFilter("tenant.id");
+
+		h.setGenerator((entity) -> {
+			UserBackupEntity ne = (UserBackupEntity) entity;
+			return dao.toUserBackup(ne);
+		}); 
+		
+		h.search(null, query, (Collection) result); 
+
+		PagedResult<UserBackup> pagedResult = new PagedResult<UserBackup>();
+		pagedResult.setResources(result);
+		pagedResult.setStartIndex( first != null ? first: 0);
+		pagedResult.setItemsPerPage( pageSize );
+		pagedResult.setTotalResults(h.count());
+		return pagedResult;
+	}
+
 
 }

@@ -1,128 +1,199 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><?page id="federacioIdentitats" title="Self certificate configuration"?>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?taglib uri="/WEB-INF/tld/web/core.dsp.tld" prefix="c" ?>
-<?init class="es.caib.seycon.ng.web.CheckPermisos" arg0="selfCertificate" ?>
-<?component name="input_criteri" macro-uri="/comu/input_criteri.zul"?>
-<?component name="input_dada" macro-uri="/comu/input_dada.zul"?>
-<?component name="input_etiqueta" macro-uri="/comu/input_etiqueta.zul"?>
-<zk xmlns:h="http://www.w3.org/1999/xhtml">
+<?taglib uri="/WEB-INF/tld/soffid.dsp.tld" prefix="soffid" ?>
 
-	<zscript>
-	<![CDATA[
-	import es.caib.zkib.datasource.*;
-	boolean canRestore = execution.getNativeRequest().isUserInRole(
-			"backup:restore/*");
-	
-	void restore ()
-	{
-		es.caib.zkib.zkiblaf.Missatgebox.confirmaOK_CANCEL(org.zkoss.util.resource.Labels.getLabel("backup.confirmRestore"),
-				new org.zkoss.zk.ui.event.EventListener() {
-			public void onEvent (Event event)
-			{
-				if (event.getData().equals (es.caib.zkib.zkiblaf.Missatgebox.OK))
-				{
-					doRestore();
-				}
-			}
-		});
-	}
-	
-	void doRestore () 
-	{
-		boolean any = false;
-		javax.transaction.UserTransaction tx;
-		tx = new javax.naming.InitialContext().lookup("/UserTransaction");
-		com.soffid.iam.addons.backup.service.ejb.UserBackupService backupSvc = 
-			new javax.naming.InitialContext().
-				lookup(
-					com.soffid.iam.addons.backup.service.ejb.UserBackupServiceHome.JNDI_NAME
-						);
-		boolean done = false;
-		
-		
-		Listitem item = backupsList.getSelectedItem();
-		if (item == null)
-		{
-			es.caib.zkib.zkiblaf.Missatgebox.info(org.zkoss.util.resource.Labels.getLabel("backup.noneSelected"));
-			return;			
-		}
-		
-		es.caib.zkib.component.DataModel model = Path.getComponent("/model");
-		if (model.isCommitPending())
-		{
-			es.caib.zkib.zkiblaf.Missatgebox.info(org.zkoss.util.resource.Labels.getLabel("backup.pendingChange"));
-			return;
-		}
-		
-		backupSvc.restoreBackup(item.getValue().getInstance());
+<frame xmlns:h="http://www.w3.org/1999/xhtml" mold="div" style="position: relative" 
+	parentPath="${arg.listbox }"
+	model="${arg.model }"
+	use="com.soffid.iam.addons.backup.web.UserBackupHandler" id="frame">
 
-		es.caib.zkib.zkiblaf.Missatgebox.avis(org.zkoss.util.resource.Labels.getLabel("backup.restoreComplete"));
+	<div class="navigation-bar dummy">
+		<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
+		<menu2>
+			<menu2item image="/img/group.svg" label="${c:l('backup.groupsHistory') }"  if="${soffid:isUserInRole('backup:restore')}" onClick="ref:frame.groupHistory"/>
+			<menu2item image="/img/account.svg" label="${c:l('backup.accountsHistory') }"  if="${soffid:isUserInRole('backup:restore')}" onClick="ref:frame.accountHistory"/>
+			<menu2item image="/img/role.svg" label="${c:l('backup.rolesHistory') }"  if="${soffid:isUserInRole('backup:restore')}" onClick="ref:frame.roleHistory"/>
+ 			<menu2item image="/img/maillist.svg" label="${c:l('backup.mailHistory') }"  if="${soffid:isUserInRole('backup:restore')}" onClick="ref:frame.mailHistory"/>
+			<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:handler.downloadCsv"/>
+		</menu2>
+	</div>
+
+	<datatable id="listbox" autocommit="true" 
+		multiselect="false"
+		dataPath="${arg.listbox }:/backups" maxheight="70vh" sortColumn="0"
+		onDownload="ref:frame.downloadSelected"
+		onSelect="ref:frame.selectItem" enablefilter="false">
+		<attribute name="columns"><![CDATA[
+- name: ${c:l('com.soffid.iam.addons.backup.common.UserBackup.backupDate')}
+  value: backupDate
+  template: #{backupDate_datetime}
+- name: ${c:l('com.soffid.iam.addons.backup.common.UserBackup.validUntil')}
+  value: validUntil
+  template: #{validUntil_datetime}
+- name: ${c:l('contenidoTarea.btnDescargar') }
+  template: <img src="${execution.contextPath }/img/download.svg" class="imageclic" onclick="zkDatatable.sendClientAction(this,'onDownload')"/>
+  className: statusColumn
+]]></attribute>
+	</datatable>
+	<div style="text-align: right; width: 100%">
+		<databutton id="restoreButton" image="/addon/backup/restore-r.svg" label="${c:l('backup.restore')}" datamodel="/model" onClick="ref:frame.doRestore">
+		</databutton>
+	</div>
+	
+	<window width="80%" id="groupsHistoryWindow" visible="false"
+		title="${c:l('backup.groupsHistory') }" closable="false">
+		<div class="navigation-bar dummy">
+			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
+			<menu2>
+				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+			</menu2>
+		</div>
 		
-		es.caib.zkib.component.DataListbox dlb = Path.getComponent("/esquema/lista/listbox");
-		long userId = dlb.getJXPathContext().getValue("@id");
-		model.refresh();
-		es.caib.zkib.datamodel.DataNodeCollection coll = model.getJXPathContext().getValue("/usuari");
-		for (int i = 0; i < coll.getSize(); i++)
-		{
-			es.caib.seycon.ng.comu.Usuari usuari = coll.getDataModel(i).getInstance();
-			if (usuari.getId().equals (userId))
-			{
-				dlb.setSelectedIndex(i);
-				break;
-			}
-		}	
-	}
-	
-	void showXml (Component c)
-	{
-		es.caib.zkib.binder.BindContext ctx = XPathUtils.getComponentContext(c);
-		String text = XPathUtils.getValue(ctx, "text[1]").getInstance();
-		textWindow.getFellow("textContent").setValue(text);
-		textWindow.doHighlighted();		
-	}
-
-]]>
-	</zscript>
-
-	<toolbar>
-		<toolbarbutton visible="${canRestoreBackup}" onClick="restore()"
-			label="Restore" />
-	</toolbar>
-	<listbox id="backupsList" dataPath="/esquema/lista/listbox:/backups"
-		fixedLayout="true" height="96%" onClick="" onSelect=""
-		rows="${fileres}">
-		<listhead>
-			<listheader label="${c:l('backup.date')}" sort="auto"
-				width="30%" />
-			<listheader label="${c:l('backup.validUntil')}" sort="auto"
-				width="30%" />
-			<listheader label="" width="2em" />
-		</listhead>
-		<listfoot>
-			<listfooter span="3">
-				<label id="listboxFoot" style="margin-left: 10px;" />
-			</listfooter>
-		</listfoot>
-		<dataitem bind=".">
-			<listcell>
-				<datebox disabled="true" bind="@backupDate"
-					format="${c:l('accounts.dateFormat')}" width="15em" />
-			</listcell>
-			<listcell>
-				<datebox disabled="true" bind="@validUntil"
-					format="${c:l('accounts.dateFormat')}" width="15em" />
-			</listcell>
-			<listcell>
-				<image onClick="showXml(event.target);"
-					src="/img/info.png">
-				</image>
-			</listcell>
-		</dataitem>
-	</listbox>
-	
-	<window width="80%" id="textWindow" visible="false"
-		title="${c:l('backup.contents')}" closable="true"
-		onClose="self.setVisible(false); event.stopPropagation();">
-		<textbox readonly="true" width="100%" multiline="true" rows="20"
-			id="textContent" />
+		<datatable id="listbox" autocommit="true" 
+			use="com.soffid.iam.addons.backup.web.UserGroupDatatable"
+			preference="user-group-h"
+			multiselect="true"
+			onMultiSelect="ref:frame.multiSelectGroup"
+			dataPath="${arg.model }:/groupHistory" maxheight="50vh" sortColumn="0"
+			onSelect="ref:frame.multiSelectGroup" enablefilter="true">
+		</datatable>
+		<div style="text-align: right; width: 100%">
+			<databutton id="restoreButton" image="/addon/backup/restore-r.svg" label="${c:l('backup.restore')}" datamodel="/model" onClick="ref:frame.doRestoreGroups">
+			</databutton>
+			<button image="/img/undo-r.svg" label="${c:l('error.zul.Tancar')}" 
+				onClick="ref:frame.closeGroups">
+			</button>
+		</div>
 	</window>
-</zk>
+		
+	<window width="80%" id="rolesHistoryWindow" visible="false"
+		title="${c:l('backup.rolesHistory') }" closable="false">
+		<div class="navigation-bar dummy">
+			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
+			<menu2>
+				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+			</menu2>
+		</div>
+		
+		<datatable id="listbox" autocommit="true" 
+			use="com.soffid.iam.web.user.RoleAccountDatatable"
+			preference="role-account--h"
+			multiselect="true"
+			onMultiSelect="ref:frame.multiSelectRole"
+			dataPath="${arg.model }:/roleHistory" maxheight="50vh" sortColumn="0"
+			onSelect="ref:frame.multiSelectRole" enablefilter="true">
+		<attribute name="allColumns"><![CDATA[
+- name: ${c:l('com.soffid.iam.api.RoleAccount.risk')}
+  width: 30px
+  template: <img class="small-icon" src="${execution.contextPath}/img/risk.#{sodRisk.value}.svg" style='#{sodRisk != null && sodRisk.value != ""? "": "display:none" }'>
+  className: selector
+  sort: false
+  filter: false
+  value: sodRisk
+- name: ${c:l('usuaris.zul.RoleCategory')}
+  width: 150px
+  value: roleCategory
+- name: ${c:l('usuaris.zul.Rol')}
+  value: roleName
+  default: true
+- name: ${c:l('aplica_rolinfo.zul.Descripcia')}
+  value: roleDescription
+- name: ${c:l('aplica_usuarisRolllista.zul.DescripciadeDomini')}
+  value: domainValue/value
+  default: false
+- name: ${c:l('aplicacions.zul.DomainDescription')}
+  value: domainValue/description
+  default: false
+- name: ${c:l('usuaris.zul.Bbdd')}
+  width: 150px
+  default: true
+  value: system
+- name: ${c:l('usuaris.zul.Account')}
+  width: 150px
+  value: accountName
+  default: true
+- name: ${c:l('usuaris.zul.Aplicacia')}
+  width: 150px
+  value: informationSystemName
+  default: true
+- name: ${c:l('usuaris.zul.startDate')}
+  width: 150px
+  value: startDate_date
+  default: true
+- name: ${c:l('usuaris.zul.endDate')}
+  width: 150px
+  value: endDate_date
+  default: true
+- name: ${c:l('usuaris.zul.holderGroup')}
+  width: 150px
+  value: holderGroup
+		]]>
+		</attribute>
+		</datatable>
+		<div style="text-align: right; width: 100%">
+			<databutton id="restoreButton" image="/addon/backup/restore-r.svg" label="${c:l('backup.restore')}" datamodel="/model" onClick="ref:frame.doRestoreRoles">
+			</databutton>
+			<button image="/img/undo-r.svg" label="${c:l('error.zul.Tancar')}" 
+				onClick="ref:frame.closeGroups">
+			</button>
+		</div>
+	</window>
+
+
+	<window width="80%" id="accountsHistoryWindow" visible="false"
+		title="${c:l('backup.groupsHistory') }" closable="false">
+		<div class="navigation-bar dummy">
+			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
+			<menu2>
+				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+			</menu2>
+		</div>
+		
+		<datatable id="listbox" autocommit="true" 
+			use="com.soffid.iam.addons.backup.web.AccountDatatable"
+			preference="accounts-h-cols"
+			multiselect="true"
+			onMultiSelect="ref:frame.multiSelectAccount"
+			dataPath="${arg.model }:/accountHistory" maxheight="50vh" sortColumn="0"
+			onSelect="ref:frame.multiSelectAccount" enablefilter="true">
+		</datatable>
+		<div style="text-align: right; width: 100%">
+			<databutton id="restoreButton" image="/addon/backup/restore-r.svg" label="${c:l('backup.restore')}" datamodel="/model" onClick="ref:frame.doRestoreAccounts">
+			</databutton>
+			<button image="/img/undo-r.svg" label="${c:l('error.zul.Tancar')}" 
+				onClick="ref:frame.closeGroups">
+			</button>
+		</div>
+	</window>
+
+	<window width="80%" id="mailHistoryWindow" visible="false"
+		title="${c:l('backup.groupsHistory') }" closable="false">
+		<div class="navigation-bar dummy">
+			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
+			<menu2>
+				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+			</menu2>
+		</div>
+		
+		<datatable id="listbox" autocommit="true" 
+			use="com.soffid.iam.addons.backup.web.MailListDatatable"
+			preference="maillist-h-cols"
+			multiselect="true"
+			onMultiSelect="ref:frame.multiSelectMail"
+			dataPath="${arg.model }:/mailHistory" maxheight="50vh" sortColumn="0"
+			onSelect="ref:frame.multiSelectMail" enablefilter="true">
+		</datatable>
+		<div style="text-align: right; width: 100%">
+			<databutton id="restoreButton" image="/addon/backup/restore-r.svg" label="${c:l('backup.restore')}" datamodel="/model" onClick="ref:frame.doRestoreMail">
+			</databutton>
+			<button image="/img/undo-r.svg" label="${c:l('error.zul.Tancar')}" 
+				onClick="ref:frame.closeGroups">
+			</button>
+		</div>
+	</window>
+
+</frame>

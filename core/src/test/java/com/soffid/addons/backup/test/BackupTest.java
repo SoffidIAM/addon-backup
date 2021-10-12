@@ -147,7 +147,7 @@ public class BackupTest extends AbstractHibernateTest {
 			rol.setDescripcio("Soffid test role"); //$NON-NLS-1$
 			rol.setGestionableWF(new Boolean(false));
 			rol.setNom("SOFFID_TEST"); //$NON-NLS-1$
-			rol.setDomini(new Domini());
+			rol.setDomini(null);
 			rol = appSvc.create(rol);
 			
 			Account account = accountSvc.findAccount("admin", "soffid");

@@ -5,6 +5,10 @@
 //
 
 package com.soffid.iam.addons.backup.service;
+import com.soffid.iam.addons.backup.common.UserBackup;
+import com.soffid.iam.api.AsyncList;
+import com.soffid.iam.api.PagedResult;
+import com.soffid.iam.service.AsyncRunnerService;
 import com.soffid.mda.annotation.*;
 
 import es.caib.seycon.ng.model.AccountEntity;
@@ -23,8 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 	es.caib.seycon.ng.servei.AccountService.class,
 	com.soffid.iam.addons.backup.service.UserBackupAddon.class,
 	es.caib.seycon.ng.servei.ConfiguracioService.class,
+	AsyncRunnerService.class,
 	es.caib.seycon.ng.servei.DispatcherService.class})
-public abstract class UserBackupService {
+public class UserBackupService {
 
 	@Transactional(rollbackFor={java.lang.Exception.class})
 	public void performBackup(
@@ -73,10 +78,17 @@ public abstract class UserBackupService {
 		throws es.caib.seycon.ng.exception.InternalErrorException {
 	 return null;
 	}
+
 	@Operation ( grantees={com.soffid.iam.addons.backup.backup_configure.class})
 	@Transactional(rollbackFor={java.lang.Exception.class})
 	public void setConfig(
 		com.soffid.iam.addons.backup.common.UserBackupConfig config)
 		throws es.caib.seycon.ng.exception.InternalErrorException {
 	}
+	
+	@Operation ( grantees={com.soffid.iam.addons.backup.backup_query.class})
+	public PagedResult<UserBackup> findUserBackupByJsonQuery(@Nullable String query, @Nullable Integer first, @Nullable Integer pageSize) {return null;}
+
+	@Operation ( grantees={com.soffid.iam.addons.backup.backup_query.class})
+	public AsyncList<UserBackup> findUserBackupByJsonQueryAsync(@Nullable String query) {return null;}
 }

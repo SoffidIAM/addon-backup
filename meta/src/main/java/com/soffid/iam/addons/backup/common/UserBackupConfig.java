@@ -20,6 +20,9 @@ public class UserBackupConfig {
 	public java.lang.Integer fullBackupMinute;
 
 	@Nullable
+	public boolean enableHistory;
+
+	@Nullable
 	public java.lang.String cmdToExecute;
 
 	@Nullable

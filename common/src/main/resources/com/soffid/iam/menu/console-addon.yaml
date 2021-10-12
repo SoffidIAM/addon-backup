@@ -1,0 +1,10 @@
+- name: soffid.admin
+  options:
+      - name: seu.configuration
+        options:
+        - name: seu.settings
+          options:
+          - name: backup.title
+            img: /addon/backup/menu.svg
+            permissions: ["backup:configure", "backup:restore"]
+            url: /addon/backup/configure.zul
