@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE beans
+    PUBLIC "-//SPRING//DTD BEAN//EN"
+           "http://www.springframework.org/dtd/spring-beans.dtd">
+
+<beans>
+
+    <bean id="beanRefFactory"
+         class="org.springframework.context.support.ClassPathXmlApplicationContext">
+        <constructor-arg>
+           <list>
+                <value>console-test-applicationContext.xml</value>
+                <value>plugin-test-applicationContext.xml</value>
+                <value>addon-test-applicationContext.xml</value>
+                <value>applicationContext-testDataSource.xml</value>
+           </list>
+        </constructor-arg>
+    </bean>
+    
+</beans>
