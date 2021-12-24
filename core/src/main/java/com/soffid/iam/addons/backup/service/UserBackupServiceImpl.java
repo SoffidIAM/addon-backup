@@ -179,6 +179,7 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 
 		serializeAttributes(sb, 2, userEntity.getUserData());
 		
+		Collection<RoleAccount> roleAccounts = getApplicationService().findUserRolesByUserNameNoSoD(userEntity.getUserName());
 		for (Account account: getAccountService().getUserAccounts(user))
 		{
 			if (account.getType().equals(AccountType.USER) && !account.isDisabled())
@@ -188,16 +189,18 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 				serialize (sb, 4, SYSTEM, account.getSystem(), true);
 				serialize (sb, 4, STATUS, account.getStatus().toString(), true);
 				serializeAccountAttributes (sb, 4, account.getAttributes());
-				for (RoleAccount roleAccount: getApplicationService().findRoleAccountByAccount(account.getId()))
+				for (RoleAccount roleAccount: roleAccounts)
 				{
-					serialize (sb, 4, ROLE, null, false);
-					serialize (sb, 6, NAME, roleAccount.getRoleName(), true);
-					serialize (sb, 6, SYSTEM, roleAccount.getSystem(), true);
-					if (roleAccount.getDomainValue() != null)
-						serialize (sb, 6, DOMAIN, roleAccount.getDomainValue().getValue(), true);
-					if (roleAccount.getHolderGroup() != null)
-						serialize (sb, 6, HOLDER_GROUP, roleAccount.getHolderGroup(), true);
-					closeTag (sb, 4, ROLE);
+					if (roleAccount.getAccountId().equals(account.getId())) {
+						serialize (sb, 4, ROLE, null, false);
+						serialize (sb, 6, NAME, roleAccount.getRoleName(), true);
+						serialize (sb, 6, SYSTEM, roleAccount.getSystem(), true);
+						if (roleAccount.getDomainValue() != null)
+							serialize (sb, 6, DOMAIN, roleAccount.getDomainValue().getValue(), true);
+						if (roleAccount.getHolderGroup() != null)
+							serialize (sb, 6, HOLDER_GROUP, roleAccount.getHolderGroup(), true);
+						closeTag (sb, 4, ROLE);
+					}
 				}
 				closeTag (sb, 2, ACCOUNT);
 			}
