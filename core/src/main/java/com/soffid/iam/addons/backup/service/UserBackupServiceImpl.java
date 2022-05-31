@@ -244,14 +244,15 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		{
 			if (entry.getValue() != null)
 			{
-				serialize (sb, i+2, entry.getKey(), null, false);
+				serialize (sb, i+2, "attribute", null, false);
+				serialize (sb, i+4, "name", entry.getKey(), true);
 				Object v = entry.getValue();
 				if ( v instanceof Collection)
 					for (Object vv: (Collection) v)
 						serializeAttributeValue(sb, i, vv);
 				else
 					serializeAttributeValue(sb, i, v);
-				closeTag(sb, i+2, entry.getKey());
+				closeTag(sb, i+2, "attribute");
 			}
 		}
 		closeTag(sb, i, ATTRIBUTES);
@@ -353,7 +354,11 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 		
 		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-		Document doc = dBuilder.parse(new ByteArrayInputStream (backupEntity.getData().getBytes("UTF-8")));
+		String xml = backupEntity.getData();
+		xml = xml.replace("<$soffid$previous-status>", "<attribute><name>$soffid$previous-status</name>")
+				.replace("</$soffid$previous-status>","</attribute>");
+		Document doc = dBuilder.parse(new ByteArrayInputStream (xml.getBytes("UTF-8")));
+		
 		
 		Element update= doc.getDocumentElement();
 		if (!update.getTagName().equals(USER_BACKUP))
@@ -779,7 +784,10 @@ public class UserBackupServiceImpl extends UserBackupServiceBase implements Appl
 					{
 						String tag2 = ((Element) child2).getTagName();
 						String text = child2.getTextContent(); 
-						if (tag2.equals("dateValue"))
+						if (tag2.equals("name") && tag.equals("attribute")) {
+							tag = text;
+						}
+						else if (tag2.equals("dateValue"))
 						{
 							Date d = dateformat.parse(text);
 							v.add(d);
