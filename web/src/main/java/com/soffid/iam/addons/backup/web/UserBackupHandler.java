@@ -256,7 +256,7 @@ public class UserBackupHandler extends FrameHandler {
 
 		Button b = (Button) getFellow("restoreButton");
 		b.setDisabled(dt.getSelectedIndexes() == null || dt.getSelectedIndexes().length == 0);
-		if (dt.getSelectedIndex() >= 0) {
+		if (dt.getSelectedIndexes().length > 0) {
 			Missatgebox.confirmaOK_CANCEL(Labels.getLabel("backup.confirmRestore"),
 				(event2) -> {
 					if (event2.getName().equals("onOK")) {
