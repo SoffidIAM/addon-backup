@@ -11,8 +11,8 @@
 		<maven>2.0.1</maven>
 	</prerequisites>
 	<scm>
-		<connection>scm:git:ssh://git@stash.dev.lab:7999/iam2/addon-backup.git</connection>
-		<developerConnection>scm:git:ssh://git@stash.dev.lab:7999/iam2/addon-backup.git</developerConnection>
+		<connection>scm:git:ssh://git@github.com/SoffidIAM/addon-backup.git</connection>
+		<developerConnection>scm:git:ssh://git@github.com/SoffidIAM/addon-backup.git</developerConnection>
 		  <tag>backup-2.0.0</tag>
   	</scm>
 	<build>
