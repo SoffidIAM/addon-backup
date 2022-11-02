@@ -27,7 +27,7 @@ cache:
 verify: 
   stage: verify
   script:
-    - 'base64 -d $KEYSTORE_JKS >/tmp/keystore.p12'
+    - 'base64 -d $KEYSTORE >/tmp/keystore.p12'
     - 'od -xc /tmp/keystore.p12'
     - 'mvn $MAVEN_CLI_OPTS verify'
   except:
