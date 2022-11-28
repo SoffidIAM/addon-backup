@@ -95,7 +95,7 @@ public class AccountDatatable extends DatatypeColumnsDatatable {
 	protected JSONObject getClientValue(Object element) throws JSONException {
 		JSONObject s = super.getClientValue(element);
 		AccountHistory gu = (AccountHistory) ((DataNode)element).getInstance();
-		if (new Date().after(gu.getEnd()))
+		if (gu.getEnd() != null && new Date().after(gu.getEnd()))
 			s.put("$class", "dashed");
 		return s;
 	}
