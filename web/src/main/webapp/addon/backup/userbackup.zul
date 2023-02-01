@@ -143,7 +143,7 @@
 
 
 	<window width="80%" id="accountsHistoryWindow" visible="false"
-		title="${c:l('backup.groupsHistory') }" closable="false">
+		title="${c:l('backup.accountsHistory') }" closable="false">
 		<div class="navigation-bar dummy">
 			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
 			<menu2>
@@ -170,7 +170,7 @@
 	</window>
 
 	<window width="80%" id="mailHistoryWindow" visible="false"
-		title="${c:l('backup.groupsHistory') }" closable="false">
+		title="${c:l('backup.mailHistory') }" closable="false">
 		<div class="navigation-bar dummy">
 			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
 			<menu2>
