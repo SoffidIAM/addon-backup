@@ -9,6 +9,14 @@ public class BackupBootstrapServiceImpl extends BackupBootstrapServiceBase {
 
 	@Override
 	protected void handleConsoleBoot() throws Exception {
+	}
+
+	@Override
+	protected void handleSyncServerBoot() throws Exception {
+	}
+
+	@Override
+	protected void handleTenantBoot(Tenant tenant) throws Exception {
 		UserBackupService svc = getUserBackupService();
 		UserBackupConfig cfg = svc.getConfig();
 		boolean anyChange = false;
@@ -45,14 +53,6 @@ public class BackupBootstrapServiceImpl extends BackupBootstrapServiceBase {
 		{
 			svc.setConfig(cfg);
 		}
-	}
-
-	@Override
-	protected void handleSyncServerBoot() throws Exception {
-	}
-
-	@Override
-	protected void handleTenantBoot(Tenant tenant) throws Exception {
 	}
 
 }
