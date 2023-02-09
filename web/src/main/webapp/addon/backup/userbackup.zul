@@ -46,7 +46,7 @@
 			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
 			<menu2>
 				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
-				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frame.downloadCsvGroups"/>
 			</menu2>
 		</div>
 		
@@ -73,7 +73,7 @@
 			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
 			<menu2>
 				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
-				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frame.downloadCsvGroups"/>
 			</menu2>
 		</div>
 		
@@ -148,7 +148,7 @@
 			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
 			<menu2>
 				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
-				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frame.downloadCsvGroups"/>
 			</menu2>
 		</div>
 		
@@ -175,7 +175,7 @@
 			<label bind="//user/listbox:/@userName"></label> - <label bind="//user/listbox:/@fullName"/>
 			<menu2>
 				<menu2item image="/img/change-columns.svg" label="${c:l('select-columns.title') }" onClick="ref:frame.changeColumnsGroups"/>
-				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frames.downloadCsvGroups"/>
+				<menu2item image="/img/download.svg" label="${c:l('zkdb.download') }" onClick="ref:frame.downloadCsvGroups"/>
 			</menu2>
 		</div>
 		
